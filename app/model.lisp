@@ -10,6 +10,8 @@
            #:make-vec
            #:v-x
            #:v-y
+           #:vec-add
+           #:pv-add
 
            #:problem
            #:make-problem
@@ -28,6 +30,11 @@
            #:make-vec->list
            #:solution->parsed-problem
            #:parsed-problem->problem
+
+           #:make-segment
+           #:segment-a
+           #:segment-b
+           #:segment
            ))
 
 (in-package :icfpc2021/model)
@@ -49,6 +56,10 @@
 (defstruct edge
   vertex
   len-square)
+
+(defstruct segment
+  (a (make-point) :type point)
+  (b (make-point) :type point))
 
 (defun make-point-vec (list)
   (map 'vector

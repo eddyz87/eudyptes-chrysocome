@@ -115,7 +115,7 @@
          (out-solution (solution->parsed-problem
                         p
                         solution)))
-    (assert (icfpc2021/polygon:proper-solution? out-solution))
+    (assert (icfpc2021/polygon:proper-solution? p solution))
     (values (icfpc2021/problem-defs:figure-vertices
              (icfpc2021/problem-defs:problem-figure out-solution))
             (icfpc2021/score:dislikes
