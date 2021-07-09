@@ -2,12 +2,13 @@
     (:use #:cl)
     (:import-from :icfpc2021/problem-defs)
     (:import-from :icfpc2021/parse)
+    (:import-from :icfpc2021/polygon)
     (:import-from :icfpc2021/svg-drawer))
 
 (in-package :icfpc2021/solver)
 
 (defparameter *edge-coef* 0.2)
-(defparameter *hole-coef* 0.01)
+(defparameter *hole-coef* 0.05)
 
 (defstruct (point (:conc-name p-))
   (x 0)
@@ -176,15 +177,21 @@
                  (solution->parsed-problem problem new-solution)
                  (format nil "~A_~5,'0D.svg" svg-prefix iter))
                 (if (or (< (solution-dist solution new-solution)
-                           0.01)
+                           0.001)
                         (and max-iters
                              (>= iter max-iters)))
                     (return (round-solution new-solution))
                     (setf solution new-solution))))))
 
 (defun solve-file (json-file &key max-iters svg-prefix (svg-freq 100))
-  (let ((p (parsed-problem->problem
-            (icfpc2021/parse::parse-json-file json-file))))
-    (solve p :max-iters max-iters
-             :svg-prefix svg-prefix
-             :svg-freq svg-freq)))
+  (let* ((p (parsed-problem->problem
+             (icfpc2021/parse::parse-json-file json-file)))
+         (solution
+           (solve p :max-iters max-iters
+                    :svg-prefix svg-prefix
+                    :svg-freq svg-freq)))
+    (assert (icfpc2021/polygon:proper-solution?
+             (solution->parsed-problem
+              p
+              solution)))
+    solution))

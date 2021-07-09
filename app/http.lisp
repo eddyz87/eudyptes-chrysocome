@@ -33,4 +33,6 @@
   (http-request (format nil "~A/api/problems/~A/solutions" *url-base* id)
                 :additional-headers `(("Authorization" . ,*auth-token*))
                 :method :post
-                :content (encode (plist-hash-table (list "vertices" solution)))))
+                :content (with-output-to-string (stream)
+                           (encode (plist-hash-table (list "vertices" solution))
+                                   stream))))

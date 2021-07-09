@@ -6,7 +6,8 @@
   (:export #:lines-intersect?
            #:point-in-polygon?
            #:pose-in-polygon?
-           #:pose-in-hole?))
+           #:pose-in-hole?
+           #:proper-solution?))
 
 (in-package :icfpc2021/polygon)
 
@@ -61,15 +62,21 @@
 (defun pose-in-polygon? (vertices edges poly)
   (and (some (rcurry #'point-in-polygon? poly) vertices)
        (loop :with loop-poly := (add-last poly)
-          :for line :in edges
-          :when (loop :for (p1 p2 . nil) :on loop-poly
-                   :while p2
-                   :when (lines-intersect? line (list p1 p2))
-                   :return t)
-          :return nil
-          :finally (return t))))
+             :for line :in edges
+             :when (loop :for (p1 p2 . nil) :on loop-poly
+                         :while p2
+                         :when (lines-intersect? (list (nth (first line) vertices)
+                                                       (nth (second line) vertices))
+                                                 (list p1 p2))
+                           :return t)
+               :return nil
+             :finally (return t))))
 
 (defun pose-in-hole? (pose hole)
   (pose-in-polygon? (figure-vertices pose)
                     (figure-edges pose)
                     (hole-vertices hole)))
+
+(defun proper-solution? (solution)
+  (pose-in-hole? (problem-figure solution)
+                 (problem-hole solution)))
