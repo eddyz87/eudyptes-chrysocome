@@ -4,8 +4,12 @@
                 #:http-request)
   (:import-from :flexi-streams
                 #:octets-to-string)
+  (:import-from :alexandria
+                #:with-output-to-file)
   (:export #:get-problem
-           #:post-solution))
+           #:post-solution
+           #:download-problems
+           ))
 
 (in-package :icfpc2021/http)
 
@@ -16,6 +20,11 @@
   (octets-to-string
    (http-request (format nil "~A/api/problems/~A" *url-base* id)
                  :additional-headers `(("Authorization" . ,*auth-token*)))))
+
+(defun download-problems (number output-dir)
+  (loop :for id :from 1 :to number
+     :do (with-output-to-file (file (format nil "~A/problem_~A.json" output-dir id))
+           (format file (get-problem id)))))
 
 (defun post-solution (id solution)
   (http-request (format nil "~A/api/problems/~A/solutions" *url-base* id)
