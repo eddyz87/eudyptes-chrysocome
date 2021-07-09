@@ -2,8 +2,10 @@
     (:use #:cl #:icfpc2021/model)
     (:import-from :icfpc2021/problem-defs)
     (:import-from :icfpc2021/parse)
+    (:import-from :icfpc2021/score)
     (:import-from :icfpc2021/polygon)
-    (:import-from :icfpc2021/svg-drawer))
+    (:import-from :icfpc2021/svg-drawer)
+    (:import-from :cl-ppcre))
 
 (in-package :icfpc2021/solver)
 
@@ -94,13 +96,13 @@
                          (= 0 (mod iter svg-freq)))
                 (icfpc2021/svg-drawer:problem->svg
                  (solution->parsed-problem problem new-solution)
-                 (format nil "~A_~5,'0D.svg" svg-prefix iter))
-                (if (or (< (solution-dist solution new-solution)
-                           0.001)
-                        (and max-iters
-                             (>= iter max-iters)))
-                    (return (round-solution new-solution))
-                    (setf solution new-solution))))))
+                 (format nil "~A_~5,'0D.svg" svg-prefix iter)))
+              (if (or (< (solution-dist solution new-solution)
+                         0.001)
+                      (and max-iters
+                           (>= iter max-iters)))
+                  (return (round-solution new-solution))
+                  (setf solution new-solution)))))
 
 (defun solve-file (json-file &key max-iters svg-prefix (svg-freq 100))
   (let* ((p (parsed-problem->problem
@@ -108,7 +110,35 @@
          (solution
            (solve p :max-iters max-iters
                     :svg-prefix svg-prefix
-                    :svg-freq svg-freq)))
-    (assert (icfpc2021/polygon:proper-solution?
-             (solution->parsed-problem p solution)))
-    solution))
+                    :svg-freq svg-freq))
+         (out-solution (solution->parsed-problem
+                        p
+                        solution)))
+    (assert (icfpc2021/polygon:proper-solution? out-solution))
+    (values (icfpc2021/problem-defs:figure-vertices
+             (icfpc2021/problem-defs:problem-figure out-solution))
+            (icfpc2021/score:dislikes
+             (icfpc2021/problem-defs:figure-vertices
+              (icfpc2021/problem-defs:problem-figure out-solution))
+             (icfpc2021/problem-defs:hole-vertices
+              (icfpc2021/problem-defs:problem-hole out-solution))))))
+
+(defun try-solve-all (dir)
+  (loop :for file :in (directory dir)
+        :do (multiple-value-bind (solution dislikes)
+                (ignore-errors (solve-file file :max-iters 1000))
+              (if solution
+                  (format t "~A: solved, dislikes: ~A~%" file dislikes)
+                  (format t "~A: failed~%" file)))))
+
+(defun file-problem-id (file)
+  (cl-ppcre:scan-to-strings "[0-9]+" (pathname-name file)))
+
+(defun try-solve-and-post-all (dir)
+  (loop :for file :in (directory dir)
+        :do (multiple-value-bind (solution dislikes)
+                (ignore-errors (solve-file file :max-iters 1000))
+              (when solution
+                (format t "Solution found for ~A: ~A~%" (file-problem-id file)
+                        dislikes)
+                (icfpc2021/http:post-solution (file-problem-id file) solution)))))
