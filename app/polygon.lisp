@@ -2,7 +2,6 @@
     (:use :cl
           :icfpc2021/problem-defs)
   (:import-from :alexandria
-                #:compose
                 #:rcurry)
   (:export #:lines-intersect?
            #:point-in-polygon?
@@ -59,10 +58,10 @@
                   (setf c (not c))))))
          :finally (return c))))
 
-(defun pose-in-polygon? (pose poly)
-  (and (some (compose #'car (rcurry #'point-in-polygon? poly)) pose)
+(defun pose-in-polygon? (vertices edges poly)
+  (and (some (rcurry #'point-in-polygon? poly) vertices)
        (loop :with loop-poly := (add-last poly)
-          :for line :in pose
+          :for line :in edges
           :when (loop :for (p1 p2 . nil) :on loop-poly
                    :while p2
                    :when (lines-intersect? line (list p1 p2))
@@ -71,5 +70,6 @@
           :finally (return t))))
 
 (defun pose-in-hole? (pose hole)
-  (pose-in-polygon? (figure-edges pose)
+  (pose-in-polygon? (figure-vertices pose)
+                    (figure-edges pose)
                     (hole-vertices hole)))
