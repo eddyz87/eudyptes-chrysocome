@@ -2,8 +2,8 @@
     (:use #:cl #:icfpc2021/problem-defs)
   (:import-from :yason)
   (:import-from :uiop)
-  (:export #:parse-json-file
-           #:parse-json-string))
+  (:export #:parse-json-string
+           #:parse-json-file))
 
 (in-package :icfpc2021/parse)
 
