@@ -1,5 +1,5 @@
 (uiop:define-package :icfpc2021/solver
-    (:use #:cl)
+    (:use #:cl #:icfpc2021/model)
     (:import-from :icfpc2021/problem-defs)
     (:import-from :icfpc2021/parse)
     (:import-from :icfpc2021/polygon)
@@ -9,80 +9,6 @@
 
 (defparameter *edge-coef* 0.2)
 (defparameter *hole-coef* 0.05)
-
-(defstruct (point (:conc-name p-))
-  (x 0)
-  (y 0))
-
-(defstruct (vec (:conc-name v-))
-  (x 0)
-  (y 0))
-
-(defstruct problem
-  hole
-  edges
-  init-pos
-  epsilon)
-
-(defstruct edge
-  vertex
-  len-square)
-
-(defun make-point-vec (list)
-  (map 'vector
-       (lambda (p)
-         (make-point :x (first p) :y (second p)))
-       list))
-
-(defun point-vec->list (point-vec)
-  (map 'list
-       (lambda (p)
-         (list (p-x p) (p-y p)))
-       point-vec))
-
-(defun dist-square (p1 p2)
-  (labels ((%square (x) (* x x)))
-    (+ (%square
-        (- (p-x p1) (p-x p2)))
-       (%square
-        (- (p-y p1) (p-y p2))))))
-
-(defun parsed-problem->problem (problem)
-  (let* ((hole (make-point-vec
-                (icfpc2021/problem-defs:hole-vertices
-                 (icfpc2021/problem-defs:problem-hole problem))))
-         (epsilon (icfpc2021/problem-defs:problem-epsilon problem))
-         (init-pos (make-point-vec
-                    (icfpc2021/problem-defs:figure-vertices
-                     (icfpc2021/problem-defs:problem-figure problem))))
-         (edges (make-array (length init-pos) :initial-element nil)))
-    (loop :for (edge-start edge-end) :in (icfpc2021/problem-defs:figure-edges
-                                          (icfpc2021/problem-defs:problem-figure problem))
-          :for dist-square := (dist-square (aref init-pos edge-start)
-                                           (aref init-pos edge-end))
-          :do
-             (push (make-edge :vertex edge-end :len-square dist-square)
-                   (aref edges edge-start))
-             (push (make-edge :vertex edge-start :len-square dist-square)
-                   (aref edges edge-end)))
-    (make-problem :hole hole
-                  :edges edges
-                  :init-pos init-pos
-                  :epsilon epsilon)))
-
-(defun solution->parsed-problem (problem vertex-pos)
-  (icfpc2021/problem-defs:make-problem
-   :hole (icfpc2021/problem-defs:make-hole
-          :vertices (point-vec->list (problem-hole problem)))
-   :figure (icfpc2021/problem-defs:make-figure
-            :edges (loop :for es :across (problem-edges problem)
-                         :for ind :from 0
-                         :appending (loop :for e :in es
-                                          :when (> (edge-vertex e)
-                                                   ind)
-                                            :collect (list ind (edge-vertex e))))
-            :vertices (point-vec->list vertex-pos))
-   :epsilon (problem-epsilon problem)))
 
 (defun delta-along-vec (delta p1 p2)
   (let* ((dist (sqrt (dist-square p1 p2))))
@@ -96,13 +22,6 @@
       (make-vec :x (* delta dx)
                 :y (* delta dy)))))
 
-(defun vec-add (v1 v2)
-  (make-vec :x (+ (v-x v1) (v-x v2))
-            :y (+ (v-y v1) (v-y v2))))
-
-(defun pv-add (p v)
-  (make-point :x (+ (p-x p) (v-x v))
-              :y (+ (p-y p) (v-y v))))
 
 (defun add-delta (vertex-vec num-vertex v)
   (setf (aref vertex-vec num-vertex)
@@ -191,7 +110,5 @@
                     :svg-prefix svg-prefix
                     :svg-freq svg-freq)))
     (assert (icfpc2021/polygon:proper-solution?
-             (solution->parsed-problem
-              p
-              solution)))
+             (solution->parsed-problem p solution)))
     solution))
