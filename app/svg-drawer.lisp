@@ -34,7 +34,7 @@
 (defun problem->svg (problem filename)
   (bind (((max-width . max-height) (get-dimentions problem)))
     (with-svg-to-file
-        (scene 'svg-1.1-toplevel :height max-height :width max-width)
+        (scene 'svg-1.1-toplevel :height (+ max-height 5) :width (+ max-width 5))
         (filename :if-exists :supersede)
       (draw-hole scene (problem-hole problem))
       (draw-figure scene (problem-figure problem)))))
@@ -42,14 +42,14 @@
 (defun hole->svg (hole filename)
   (bind (((max-width . max-height) (get-dimentions hole)))
     (with-svg-to-file
-        (scene 'svg-1.1-toplevel :height max-height :width max-width)
+        (scene 'svg-1.1-toplevel :height (+ max-height 5) :width (+ max-width 5))
         (filename :if-exists :supersede)
       (draw-hole scene hole))))
 
 (defun figure->svg (figure filename)
   (bind (((max-width . max-height) (get-dimentions figure)))
     (with-svg-to-file
-        (scene 'svg-1.1-toplevel :height max-height :width max-width)
+        (scene 'svg-1.1-toplevel :height (+ max-height 5) :width (+ max-width 5))
         (filename :if-exists :supersede)
       (draw-figure scene figure))))
 
