@@ -2,7 +2,8 @@
     (:use #:cl #:icfpc2021/problem-defs)
   (:import-from :yason)
   (:import-from :uiop)
-  (:export #:parse-json))
+  (:export #:parse-json-file
+           #:parse-json-string))
 
 (in-package :icfpc2021/parse)
 
@@ -16,7 +17,7 @@
          (figure-edges (gethash "edges" figure-ht))
          (figure-vertices (gethash "vertices" figure-ht))
          (epsilon (gethash "epsilon" ht)))
-    (make-problem :hole holes-list
+    (make-problem :hole (make-hole :vertices holes-list)
                   :figure (make-figure :edges figure-edges
                                        :vertices figure-vertices)
                   :epsilon epsilon)))

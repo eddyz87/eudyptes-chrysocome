@@ -8,7 +8,10 @@
            #:figure
            #:make-figure
            #:figure-edges
-           #:figure-vertices))
+           #:figure-vertices
+           #:hole
+           #:make-hole
+           #:hole-vertices))
 
 (in-package :icfpc2021/problem-defs)
 
@@ -16,6 +19,9 @@
   hole
   figure
   epsilon)
+
+(defstruct hole
+  vertices)
 
 (defstruct figure
   edges
