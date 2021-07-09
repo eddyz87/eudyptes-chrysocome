@@ -5,6 +5,7 @@
     (:import-from :icfpc2021/score)
     (:import-from :icfpc2021/polygon)
     (:import-from :icfpc2021/svg-drawer)
+    (:import-from :icfpc2021/http)
     (:import-from :cl-ppcre))
 
 (in-package :icfpc2021/solver)
