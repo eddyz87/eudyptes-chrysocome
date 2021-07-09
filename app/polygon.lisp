@@ -5,7 +5,8 @@
                 #:rcurry)
   (:export #:lines-intersect?
            #:point-in-polygon?
-           #:pose-in-polygon?))
+           #:pose-in-polygon?
+           #:pose-in-hole?))
 
 (in-package :icfpc2021/polygon)
 
@@ -69,3 +70,7 @@
                    :return t)
           :return nil
           :finally (return t))))
+
+(defun pose-in-hole? (pose hole)
+  (pose-in-polygon? (figure-vertices pose)
+                    (hole-vertices hole)))
