@@ -85,7 +85,19 @@
 		 :cellspacing "1"
 		 :text-align "center")
 	 (mapcar #'html-row-for-problem
-		 (uiop:directory-files problems-dir)))))
+                 (sort-problems (uiop:directory-files problems-dir))))))
+
+(defun sort-problems (files)
+  (loop :for path :in files
+        :for num := (cl-ppcre:register-groups-bind (num-str)
+                        ("problem_([0-9]+)" (pathname-name path))
+                      (parse-integer num-str))
+        :if num
+          :collect (cons num path) :into num-problems
+        :else
+          :collect path :into non-num-problems
+        :finally (return (append (mapcar #'cdr (sort num-problems #'< :key #'car))
+                                 (sort non-num-problems #'string< :key #'namestring)))))
 
 (defun visualizer-main (&key (port 8888))
   (publish
