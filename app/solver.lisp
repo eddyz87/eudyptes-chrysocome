@@ -61,18 +61,6 @@
               (setf min-i i))
         :finally (return min-i)))
 
-(defun mapc-edges (vertices edges-list-array func)
-  (loop :for i :below (length vertices)
-        :for p := (aref vertices i)
-        :for edges := (aref edges-list-array i)
-        :do (loop :for edge :in edges
-                  :do (funcall func
-                               i
-                               p
-                               (edge-vertex edge)
-                               (aref vertices (edge-vertex edge))
-                               (edge-len-square edge)))))
-
 (defun mapc-poly-edges (vertices func)
   (loop
     :for i :below (length vertices)
