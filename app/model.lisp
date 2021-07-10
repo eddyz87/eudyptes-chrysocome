@@ -48,13 +48,14 @@
   (y 0))
 
 (defstruct problem
-  hole
-  edges
-  init-pos
+  hole     ;; (array point)       -- all vertices of the hole
+  edges    ;; (array (list edge)) -- edges[w] = (list (edge :vertex u), (edge :vertex v)) meaning:
+           ;;                        there are figure edges (w, u), (w, v)
+  init-pos ;; (array point)       -- initial coordinates for figure vertexes like u,v,w
   epsilon)
 
 (defstruct edge
-  vertex
+  vertex ;; destination figure vertex index
   len-square)
 
 (defstruct segment
