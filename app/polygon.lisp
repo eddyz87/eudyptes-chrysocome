@@ -7,7 +7,7 @@
   (:export #:lines-intersect?
            #:point-in-polygon?
            #:pose-in-polygon?
-           #:proper-solution?))
+           #:check-solution))
 
 (in-package :icfpc2021/polygon)
 
@@ -119,9 +119,12 @@
                                      (ratio (abs (- (/ dist-square orig-dist-square) 1))))
                                 (<= (* ratio 1000000) epsilon)))))
 
-;; TODO: validate edge length
-(defun proper-solution? (problem vertices)
-  (and (same-edge-lengths? vertices (problem-edges problem) (problem-epsilon problem))
-       (pose-in-polygon? vertices
-                         (problem-edges problem)
-                         (problem-hole problem))))
+(defun check-solution (problem vertices)
+  (cond
+    ((null (same-edge-lengths? vertices (problem-edges problem) (problem-epsilon problem)))
+     :length-missmatch)
+    ((null (pose-in-polygon? vertices
+                              (problem-edges problem)
+                              (problem-hole problem)))
+     :pose-outside-poly)
+    (t :ok)))

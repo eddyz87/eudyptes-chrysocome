@@ -115,7 +115,10 @@
          (out-solution (solution->parsed-problem
                         p
                         solution)))
-    (assert (icfpc2021/polygon:proper-solution? p solution))
+    (ecase (icfpc2021/polygon:check-solution p solution)
+      (:ok nil)
+      (:length-missmatch (error "Length missmatch"))
+      (:pose-outside-poly (error "Pose outside polygon")))
     (values (icfpc2021/problem-defs:figure-vertices
              (icfpc2021/problem-defs:problem-figure out-solution))
             (icfpc2021/score:dislikes

@@ -57,18 +57,18 @@
   (ematch (parse-json-file problem-file)
     ((problem :hole hole :figure figure)
      (multiple-value-bind (solution dislikes massacred-problem)
-	 (ignore-errors
-	  (icfpc2021/solver::solve-file problem-file
-					:max-iters 1000))
+         (ignore-errors
+           (icfpc2021/solver::solve-file problem-file
+                                         :max-iters 1000))
        
        (let ((message (if solution
-			  (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
-			  (format nil "~A<br/>~%Failed~%" problem-file))))
-	 ;;(format t "~A~%" message)
-	 (values (hole->svg-string hole)
-		 (figure->svg-string figure)
-		 (when solution (solution->svg-string massacred-problem))
-		 message))))))
+                          (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
+                          (format nil "~A<br/>~%Failed ~A~%" problem-file dislikes))))
+         ;;(format t "~A~%" message)
+         (values (hole->svg-string hole)
+                 (figure->svg-string figure)
+                 (when solution (solution->svg-string massacred-problem))
+                 message))))))
 
 (defun html-row-for-problem (problem-file)
   (multiple-value-bind (hole-str figure-str solution-str message)
