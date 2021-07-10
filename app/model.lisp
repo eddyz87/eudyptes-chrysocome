@@ -75,7 +75,9 @@
        point-vec))
 
 (defun dist-square (p1 p2)
-  (labels ((%square (x) (* x x)))
+  (labels ((%square (x)
+             (or (ignore-errors (* x x))
+                 0)))
     (+ (%square
         (- (p-x p1) (p-x p2)))
        (%square
