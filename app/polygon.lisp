@@ -94,6 +94,15 @@
                 :do (format t "~A" (if (= 1 (aref raster x y)) "x" ".")))
       :do (format t "~%"))
     (loop
+      :with (mx my) := (array-dimensions raster)
+      :for y :below my
+      :do (loop :for x :below mx
+                :for raster-result := (= 1 (aref raster x y))
+                :for analytic-result := (point-in-polygon? (make-point :x x :y y) poly)
+                :unless (eq raster-result analytic-result)
+                  :do (format t "Divergence at ~A, ~A: ~A vs ~A~%"
+                              x y raster-result analytic-result)))
+    (loop
       :for test-case :in points
       :for (x y expected) := test-case
       :for result := (point-in-polygon? (make-point :x x :y y) poly)
