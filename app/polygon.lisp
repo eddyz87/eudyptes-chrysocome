@@ -4,10 +4,13 @@
           #:trivia)
   (:import-from :alexandria
                 #:rcurry)
+  (:import-from #:metabang-bind
+		#:bind)
   (:export #:lines-intersect?
            #:point-in-polygon?
            #:pose-in-polygon?
-           #:check-solution))
+           #:check-solution
+           #:rasterize-polygon))
 
 (in-package :icfpc2021/polygon)
 
@@ -75,20 +78,30 @@
            :finally (return c)))))
 
 (defun point-in-polygon?-test ()
-  (let ((poly (make-point-vec '((00 20) (10 20) (20 10) (30 20) (20 00))))
-        (points '(( 00 00 nil)
-                  ( 20 00 t)
-                  ( 00 20 t)
-                  (-10 20 nil)
-                  ( 20 07 t)
-                  ( 05 20 t)
-                  ( 20 20 nil))))
+  (let* ((poly (make-point-vec '((00 20) (10 20) (20 10) (30 20) (20 00))))
+         (points '(( 00 00 nil)
+                   ( 20 00 t)
+                   ( 00 20 t)
+                   ;;(-10 20 nil)
+                   ( 20 07 t)
+                   ( 05 20 t)
+                   ( 20 20 nil)))
+         (raster (rasterize-polygon 32 32 poly)))
+    (loop
+      :with (mx my) := (array-dimensions raster)
+      :for y :from (1- my) :downto 0
+      :do (loop :for x :below mx
+                :do (format t "~A" (if (= 1 (aref raster x y)) "x" ".")))
+      :do (format t "~%"))
     (loop
       :for test-case :in points
       :for (x y expected) := test-case
       :for result := (point-in-polygon? (make-point :x x :y y) poly)
+      :for raster-result := (= 1 (aref raster x y))
       :unless (eq expected result)
-        :do (format t "Bad answer for ~A: ~A~%" test-case result))))
+        :do (format t "Bad answer for ~A: ~A~%" test-case result)
+      :unless (eq expected raster-result)
+        :do (format t "Bad raster answer for ~A: ~A~%" test-case raster-result))))
 
 (defun pose-in-polygon? (vertices edges-list-array poly)
   (and (loop :for v :across vertices
@@ -133,3 +146,32 @@
                               (problem-hole problem)))
      :pose-outside-poly)
     (t :ok)))
+
+(defun rasterize-polygon (max-x max-y poly)
+  (loop
+    :with arr := (make-array (list max-x max-y) :element-type 'bit)
+    :for y :below max-y
+    :for intersections
+      := (loop
+           :with intersections
+           :for i :below (length poly)
+           :for a := (aref poly i)
+           :for b := (aref poly (mod (1+ i) (length poly)))
+           :do (bind (((:structure p- (ax x) (ay y)) a)
+                      ((:structure p- (bx x) (by y)) b)
+                      (dx (- bx ax))
+                      (dy (- by ay)))
+                 (when (<= (min ay by) y (max ay by))
+                   (cond ((= dx 0)
+                          (push ax intersections))
+                         ((= dy 0)
+                          ;; no intersection
+                          )
+                         (t (let ((x (+ ax (* (/ dx dy) (- y ay)))))
+                              (push x intersections))))))
+           :finally (return (sort intersections #'<)))
+    :do (loop :for (l r) :on intersections :by #'cddr
+              :when (and l r)
+                :do (loop :for x :from (ceiling l) :to (floor r)
+                          :do (setf (aref arr x y) 1)))
+    :finally (return arr)))
