@@ -13,6 +13,7 @@
   (%add-local-dir "lib")
   (%add-local-dir "app"))
 
+(ql:quickload :aserve)
 (ql:quickload :icfpc2021)
 
 ;; https://www.urbandictionary.com/define.php?term=locked+and+loaded+and+good+to+go
