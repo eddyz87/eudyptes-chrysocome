@@ -54,13 +54,17 @@
       (draw-figure scene figure))))
 
 (defun draw-hole (scene hole)
-  (loop :for (start end) :on (hole-vertices hole) :by #'cdr
-        :do (draw-line-segment scene start end)))
+  (let ((vertices (append (hole-vertices hole)
+			  (list (car (hole-vertices hole))))))
+    (loop :for (start end) :on vertices :by #'cdr
+	  :when (and start end)
+            :do (draw-line-segment scene start end))))
 
 (defun draw-figure (scene figure)
   (loop :for edge :in (figure-edges figure)
         :for start := (nth (first edge) (figure-vertices figure))
         :for end := (nth (second edge) (figure-vertices figure))
+	:when (and start end)
         :do (draw-line-segment scene start end :stroke "red")))
 
 (defun draw-line-segment (scene start end &key (stroke "black") (stroke-width 1))
