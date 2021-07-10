@@ -56,22 +56,14 @@
      mcts-root
      (lambda (reverse-actions)
        (let ((state (make-initial-state)))
-         (loop :for action :in reverse-actions
-               :do (next-state state action))
-         (let ((score (aref (estimate-state-rewards state nil) 0)))
-           (when (and (= (length reverse-actions) 5)
-                      (possible-actions state 0))
-             (format t "Rev actions: ~A~%" reverse-actions)
-             (format t "Actions #: ~A want ~A~%"
-                     (length reverse-actions)
-                     figure-vertices-num)
-             (format t "Possible actions: ~A~%" (possible-actions state 0)))
-           (when (and
-                  (= (length reverse-actions) figure-vertices-num)
-                  (or (null best-score/solution)
-                      (< (car best-score/solution) score)))
-             (setf best-score/solution
-                   (cons score (state-fixed-vertices state))))))))
+         (when (= (length reverse-actions) figure-vertices-num)
+           (loop :for action :in reverse-actions
+                 :do (next-state state action))
+           (let ((score (aref (estimate-state-rewards state nil) 0)))
+             (when (or (null best-score/solution)
+                       (< (car best-score/solution) score))
+               (setf best-score/solution
+                     (cons score (state-fixed-vertices state)))))))))
     (cdr best-score/solution)))
 
 (defstruct state
