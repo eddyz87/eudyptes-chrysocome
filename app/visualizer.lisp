@@ -6,6 +6,8 @@
 	  #:icfpc2021/parse
 	  #:icfpc2021/problem-defs
 	  )
+  (:import-from #:icfpc2021/model
+                #:solution->parsed-problem)
   (:import-from #:cl-svg)
   (:import-from #:metabang-bind
 		#:bind)
@@ -84,7 +86,7 @@
         :finally (return (append (mapcar #'cdr (sort num-problems #'< :key #'car))
                                  (sort non-num-problems #'string< :key #'namestring)))))
 
-(defun solve-all (svg-freq)
+(defun solve-all (solutions)
   (loop :for problem-file :in (sort-problems (uiop:directory-files (asdf:system-relative-pathname :icfpc2021 "../problems/")))
      :collect (ematch (parse-json-file problem-file)
                 ((problem :hole hole :figure figure)
@@ -92,8 +94,9 @@
                      (ignore-errors
                        (icfpc2021/solver::solve-file problem-file
                                                      :max-iters 1000
-                                                     :svg-prefix (format nil "~A~A" *svg-dir* (problem-id problem-file))
-                                                     :svg-freq svg-freq))
+                                                     :hook (lambda (problem solution)
+                                                             (push (solution->parsed-problem problem solution)
+                                                                   (gethash (problem-id problem-file) solutions)))))
                    
                    (let ((message (if solution
                                       (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
@@ -103,42 +106,28 @@
                            (figure->svg-string figure)
                            (if solution
                                (solution->svg-string massacred-problem)
-                               (format nil "<a href=\"/~A_0\">Run</a>" (problem-id problem-file)))
+                               (format nil "<a href=\"/~A\">Run</a>" (problem-id problem-file)))
                            message)))))))
 
-(defun visualizer-main (&key (port 8888) (svg-freq 100))
-  (ensure-directories-exist *svg-dir*)
-  (let ((solutions (solve-all svg-freq)))
+(defun visualizer-main (&key (port 8888))
+  (let ((solutions (make-hash-table)))
     (publish
      :path "/" 
      :content-type "text/html"
      :function (lambda (req ent)
                  (with-http-response (req ent)
                    (with-http-body (req ent)
-                     (problems-table solutions))))))
-  (publish-solutions svg-freq)
+                     (problems-table (solve-all solutions))))))
+    (publish-solutions (length (uiop:directory-files (asdf:system-relative-pathname :icfpc2021 "../problems/"))) solutions))
   (net.aserve:start :port port))
 
-(defun publish-solutions (svg-freq)
-  (loop :for file :in (uiop:directory-files *svg-dir*)
-     :for groups := (cl-ppcre:register-groups-bind (p s)
-                        ("([0-9])+_([0-9]{5})" (pathname-name file))
-                      (cons p (parse-integer s)))
-     :when groups
+(defun publish-solutions (problems solutions)
+  (loop :for id :from 1 :to problems
      :do (publish
-          :path (format nil "/~A_~A" (car groups) (cdr groups))
+          :path (format nil "/~A" id)
           :content-type "text/html"
-          :function (let ((file file)
-                          (groups groups))
-                      (lambda (req ent)
-                        (with-http-response (req ent)
-                          (with-http-body (req ent)
-                            (html ((:div :display "flex")
-                                   ((:div :width "10%")
-                                    ((:a :href (format nil "/~A_~A" (car groups) (- (cdr groups) svg-freq)))
-                                     (:princ "Prev")))
-                                   ((:div :width "80%")
-                                    (:princ (uiop:read-file-string file)))
-                                   ((:div :width "10%")
-                                    ((:a :href (format nil "/~A_~A" (car groups) (+ (cdr groups) svg-freq)))
-                                     (:princ "Next"))))))))))))
+          :function (lambda (req ent)
+                      (with-http-response (req ent)
+                        (with-http-body (req ent)
+                          (loop :for sol :in (reverse (gethash id solutions))
+                               :do (html (:div (solution->svg-string sol))))))))))

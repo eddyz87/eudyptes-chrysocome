@@ -161,6 +161,7 @@
 
 (defun solve-phase (problem solution
                     &key
+                      hook
                       max-iters svg-prefix (svg-freq 100)
                       edge-force-coef hole-force-coef to-inner-force)
   (loop :for iter :from 0
@@ -175,6 +176,7 @@
               (icfpc2021/svg-drawer:problem->svg
                (solution->parsed-problem problem new-solution)
                (format nil "~A_~5,'0D.svg" svg-prefix iter)))
+            (funcall hook problem new-solution)
             (if (or (< (solution-dist solution new-solution)
                        0.001)
                     (and max-iters
@@ -182,7 +184,7 @@
                 (return (round-solution new-solution))
                 (setf solution new-solution))))
 
-(defun solve-phases (problem &key max-iters svg-prefix (svg-freq 100) phases)
+(defun solve-phases (problem &key max-iters svg-prefix (svg-freq 100) phases hook)
   (let ((solution (problem-init-pos problem)))
     (loop :for phase-spec :in phases
           :for phase-num :from 0
@@ -192,15 +194,17 @@
                      :max-iters max-iters
                      :svg-prefix (when svg-prefix
                                    (format nil "~A_~A" svg-prefix phase-num))
+                     :hook hook
                      :svg-freq svg-freq
                      phase-spec)))
     solution))
 
-(defun solve (problem &key max-iters svg-prefix (svg-freq 100))
+(defun solve (problem &key max-iters svg-prefix (svg-freq 100) hook)
   (solve-phases problem
                 :max-iters max-iters
                 :svg-prefix svg-prefix
                 :svg-freq svg-freq
+                :hook hook
                 :phases (list (list :edge-force-coef 0.05
                                     :hole-force-coef 0.2
                                     :to-inner-force 0.5)
@@ -220,7 +224,7 @@
          (car variants-list)))
       (mapcar #'list (car variants-list))))
 
-(defun best-solution (problem &key max-iters svg-prefix (svg-freq 100) coef-variants)
+(defun best-solution (problem &key max-iters svg-prefix (svg-freq 100) coef-variants hook)
   (loop :with best-dislikes := nil
         :with best-solution := nil
         :for coefs :in (combinations coef-variants)
@@ -234,6 +238,7 @@
                                 :svg-prefix (when svg-prefix
                                               (format nil "~A_~A" svg-prefix iter))
                                 :svg-freq svg-freq
+                                :hook hook
                                 :phases (list (list :edge-force-coef ec1
                                                     :hole-force-coef hc1
                                                     :to-inner-force ic1)
@@ -256,7 +261,7 @@
                       (setf best-dislikes dislikes))))))
         :finally (return best-solution)))
 
-(defun solve-file (json-file &key max-iters svg-prefix (svg-freq 100))
+(defun solve-file (json-file &key max-iters svg-prefix (svg-freq 100) hook)
   (let* ((p (parsed-problem->problem
              (icfpc2021/parse::parse-json-file json-file)))
          (solution
@@ -267,6 +272,7 @@
                           :max-iters max-iters
                           :svg-prefix svg-prefix
                           :svg-freq svg-freq
+                          :hook hook
                           :coef-variants '((0.05) (0.2 0.5) (0.5 0.7)
                                            (0.1 0.2 0.3) (0 0.01) (0.5 0.7))))
          (out-solution (when solution
