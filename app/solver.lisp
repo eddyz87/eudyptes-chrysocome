@@ -122,7 +122,8 @@
              (icfpc2021/problem-defs:figure-vertices
               (icfpc2021/problem-defs:problem-figure out-solution))
              (icfpc2021/problem-defs:hole-vertices
-              (icfpc2021/problem-defs:problem-hole out-solution))))))
+              (icfpc2021/problem-defs:problem-hole out-solution)))
+	    out-solution)))
 
 (defun try-solve-all (dir)
   (loop :for file :in (uiop:directory-files dir)
