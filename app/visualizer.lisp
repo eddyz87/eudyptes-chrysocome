@@ -23,28 +23,33 @@
 (defun visualizer-main (&key (port 8888))
   (publish :path "/" 
 	   :content-type "text/html"
-	   :function #'svg-page)
+	   :function #'problems-page)
   (net.aserve:start :port port))
 
-(defun svg-page (req ent)
+(defmacro problems-table ()
+  (let ((problems-dir (asdf:system-relative-pathname 'icfpc2021 "../problems/")))
+    `(html ,@(mapcar #'html-row-for-problem
+		     (uiop:directory-files problems-dir)))))
+
+(defun problems-page (req ent)
   (with-http-response (req ent)
     (with-http-body (req ent)
-      ;; (let ((stream (request-reply-stream req)))
-      ;; 	)
-      (html (:table (print
-		     (html-row-for-problem
-		       (asdf:system-relative-pathname 'icfpc2021 "../problems/problem_1.json")))
-		    )))))
-; (asdf:system-relative-pathname 'icfpc2021 "../problems/problem_1.json")
+      (html ((:table :bgcolor "white"
+		     :bordercolor "black"
+		     :border "1" :cellpadding "5"
+		     :cellspacing "1"
+		     :text-align "center")
+	     (problems-table))))))
+
 (defun html-row-for-problem (problem-file)
-  (let* ((problem (parse-json-file problem-file)))
+  (let* ((problem (parse-json-file problem-file))
+	 )
     (ematch problem
-      ((problem :hole hole
-		:figure figure)
-       (let* ((hole-str (hole->svg-string hole))
-	      (figure-str (figure->svg-string figure)))
-	 (html (:tr (:td (:princ (print hole-str)))
-		    (:td (:princ figure-str)))))))))
+      ((problem :hole hole :figure figure)
+       `(:tr (:td
+	      (:princ ,(hole->svg-string hole)))
+	     (:td
+	      (:princ ,(figure->svg-string figure))))))))
 
 (defun hole->svg-string (hole)
   (shape->svg-string hole #'icfpc2021/svg-drawer::draw-hole))

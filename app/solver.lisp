@@ -125,7 +125,7 @@
               (icfpc2021/problem-defs:problem-hole out-solution))))))
 
 (defun try-solve-all (dir)
-  (loop :for file :in (directory dir)
+  (loop :for file :in (uiop:directory-files dir)
         :do (multiple-value-bind (solution dislikes)
                 (ignore-errors (solve-file file :max-iters 1000))
               (if solution
