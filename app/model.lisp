@@ -35,6 +35,8 @@
            #:segment-a
            #:segment-b
            #:segment
+
+           #:mapc-edges
            ))
 
 (in-package :icfpc2021/model)
@@ -127,3 +129,15 @@
 (defun pv-add (p v)
   (make-point :x (+ (p-x p) (v-x v))
               :y (+ (p-y p) (v-y v))))
+
+(defun mapc-edges (vertices edges-list-array func)
+  (loop :for i :below (length vertices)
+        :for p := (aref vertices i)
+        :for edges := (aref edges-list-array i)
+        :do (loop :for edge :in edges
+                  :do (funcall func
+                               i
+                               p
+                               (edge-vertex edge)
+                               (aref vertices (edge-vertex edge))
+                               (edge-len-square edge)))))
