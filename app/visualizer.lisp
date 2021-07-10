@@ -86,17 +86,19 @@
         :finally (return (append (mapcar #'cdr (sort num-problems #'< :key #'car))
                                  (sort non-num-problems #'string< :key #'namestring)))))
 
-(defun solve-all (solutions)
+(defun solve-all (solutions &key (hook-iters 100))
   (loop :for problem-file :in (sort-problems (uiop:directory-files (asdf:system-relative-pathname :icfpc2021 "../problems/")))
      :collect (ematch (parse-json-file problem-file)
                 ((problem :hole hole :figure figure)
                  (multiple-value-bind (solution dislikes massacred-problem)
                      (ignore-errors
-                       (icfpc2021/solver::solve-file problem-file
-                                                     :max-iters 1000
-                                                     :hook (lambda (problem solution)
-                                                             (push (solution->parsed-problem problem solution)
-                                                                   (gethash (problem-id problem-file) solutions)))))
+                       (let ((iter 0))
+                         (icfpc2021/solver::solve-file problem-file
+                                                       :max-iters 1000
+                                                       :hook (lambda (problem solution)
+                                                               (when (zerop (mod (incf iter) hook-iters))
+                                                                 (push (solution->parsed-problem problem solution)
+                                                                       (gethash (problem-id problem-file) solutions)))))))
                    
                    (let ((message (if solution
                                       (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
@@ -109,7 +111,7 @@
                                (format nil "<a href=\"/~A\">Run</a>" (problem-id problem-file)))
                            message)))))))
 
-(defun visualizer-main (&key (port 8888))
+(defun visualizer-main (&key (port 8888) (hook-iters 100))
   (let ((solutions (make-hash-table)))
     (publish
      :path "/" 
@@ -117,7 +119,7 @@
      :function (lambda (req ent)
                  (with-http-response (req ent)
                    (with-http-body (req ent)
-                     (problems-table (solve-all solutions))))))
+                     (problems-table (solve-all solutions :hook-iters hook-iters))))))
     (publish-solutions (length (uiop:directory-files (asdf:system-relative-pathname :icfpc2021 "../problems/"))) solutions))
   (net.aserve:start :port port))
 
