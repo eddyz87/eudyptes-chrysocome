@@ -8,6 +8,7 @@
 	  )
   (:import-from #:icfpc2021/model
                 #:solution->parsed-problem)
+  (:import-from #:icfpc2021/solver)
   (:import-from #:cl-svg)
   (:import-from #:metabang-bind
 		#:bind)

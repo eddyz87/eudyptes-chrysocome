@@ -1,5 +1,6 @@
 ;; As described in:
 ;;   http://www.cameronius.com/cv/mcts-survey-master.pdf
+;; A Survey of Monte Carlo Tree Search Methods
 
 (defpackage :icfpc2021/mcts
   (:use :common-lisp)
@@ -10,7 +11,8 @@
            #:show-state
            #:estimate-state-rewards
            #:print-decision-tree
-           #:count-nodes)
+           #:count-nodes
+           #:mapc-children-actions)
   (:import-from :cl-ppcre))
 
 (in-package :icfpc2021/mcts)
@@ -50,7 +52,7 @@
              :initform nil
              :accessor children
              :initarg :children
-             :documentation "list of pairs (action . node) where
+             :documentation "list of pairs (node . action) where
    'action' applied to state for 'this node' leads to 'node'") ))
 
 (defgeneric possible-actions (state player)
@@ -252,3 +254,11 @@
            (dolist (c (children n))
              (push (car c) queue))))
     count))
+
+(defun mapc-children-actions (root fn)
+  (labels ((%traverse (actions node)
+             (loop :for (child-node . action) :in (children node)
+                   :for new-actions := (cons action actions)
+                   :do (funcall fn new-actions)
+                   :do (%traverse new-actions child-node))))
+    (%traverse nil root)))

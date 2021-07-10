@@ -301,23 +301,3 @@
                 (format t "Solution found for ~A: ~A~%" (file-problem-id file)
                         dislikes)
                 (icfpc2021/http:post-solution (file-problem-id file) solution)))))
-
-;; Algorithm:
-;; - compute shortest path matrix
-;; - Vf := random figure vertex
-;; - Vh := random hole vertex
-;; - initial state Vf = Vh
-;; - state:
-;;   - set of already fixed vertexes
-;;   - frontier
-;;   - current score
-;;   - estimate
-;; - move:
-;;   - pick / pop? a vertex from frontier
-;;   - possible locations (L):
-;;     1. a full circle -> how many integer coordinates are there?
-;;     2. intersection of circles for connected fixed points
-;;     Subject of the following constraints:
-;;       - for every fixed point F:
-;;           euclidian_distance(F, L) <=  graph_shortest_path(F, L)
-;;       - L is inside of the polygon
