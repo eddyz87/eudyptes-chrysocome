@@ -24,8 +24,8 @@
    (http-request (format nil "~A/api/problems/~A" *url-base* id)
                  :additional-headers `(("Authorization" . ,*auth-token*)))))
 
-(defun download-problems (number output-dir)
-  (loop :for id :from 1 :to number
+(defun download-problems (output-dir &key (from 1) (to from))
+  (loop :for id :from from :to to
      :do (with-output-to-file (file (format nil "~A/problem_~A.json" output-dir id))
            (format file (get-problem id)))))
 
