@@ -25,17 +25,18 @@
             (c2 (- y3 y1))
             (d (- (* a1 b2)
                   (* a2 b1))))
-       (unless (= d 0)
-         (and (< 0
-                 (/ (- (* c1 b2)
-                       (* c2 b1))
-                    d)
-                 1)
-              (< 0
-                 (/ (- (* a1 c2)
-                       (* a2 c1))
-                    (- d))
-                 1)))))))
+       (handler-case
+           (and (< 0
+                   (/ (- (* c1 b2)
+                         (* c2 b1))
+                      d)
+                   1)
+                (< 0
+                   (/ (- (* a1 c2)
+                         (* a2 c1))
+                      (- d))
+                   1))
+         (arithmetic-error () nil))))))
 
 (deftype poly () '(vector point))
 
@@ -117,6 +118,10 @@
                       :always (let* ((dist-square (dist-square p target))
                                      (orig-dist-square (edge-len-square edge))
                                      (ratio (abs (- (/ dist-square orig-dist-square) 1))))
+                                ;; (format t "Edge ~A,~A (~A, ~A), dist-square = ~A, orig = ~A, ratio = ~A~%"
+                                ;;         i (edge-vertex edge)
+                                ;;         p target
+                                ;;         dist-square orig-dist-square (float ratio))
                                 (<= (* ratio 1000000) epsilon)))))
 
 (defun check-solution (problem vertices)
