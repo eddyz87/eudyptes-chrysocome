@@ -167,10 +167,27 @@
       (loop :for hole-point :across (problem-hole *problem*)
             :collect (cons 0 hole-point))
       (with-slots (fixed-vertices frontier) s
-        (loop
-          :for free-vertex :in frontier
-          :append (loop :for position :in (possible-positions fixed-vertices free-vertex)
-                        :collect (cons free-vertex position))))))
+        ;; (when frontier
+        ;;   (let* ((free-vertex (car frontier))
+        ;;          (actions
+        ;;            (loop :for position :in (possible-positions fixed-vertices free-vertex)
+        ;;                  :collect (cons free-vertex position))))
+        ;;     (format t "State ~A: ~A~%" fixed-vertices actions)
+        ;;     actions))
+        (let* ((vertex-actions
+                 (loop
+                   :for free-vertex :in frontier
+                   :collect (cons free-vertex
+                                  (loop :for position :in (possible-positions fixed-vertices free-vertex)
+                                        :collect position))))
+               (best-action (alexandria:extremum vertex-actions
+                                                 #'<
+                                                 :key (lambda (action)
+                                                        (length (cdr action))))))
+          ;; (format t "State ~A: ~A~%" fixed-vertices best-action)
+          (mapcar (lambda (act)
+                    (cons (car best-action) act))
+                  (cdr best-action))))))
 
 ;; TODO: remove points that add intersections with hole edges !!!!
 (defun possible-positions (fixed-vertices free-vertex)
