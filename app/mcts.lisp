@@ -88,6 +88,8 @@
   (let* ((*exploration-coefficient* 0))
     (cdr (select-best-child root))))
 
+(defvar *nodes-expanded*)
+
 (defun select-next-move (&key
                            root-state
                            root-player
@@ -95,7 +97,8 @@
                            timeout-in-seconds
                            (exploration-coefficient 1)
                            (max-selection-depth 1000)
-                           players-number)
+                           players-number
+                           expand-node-exit-treshold)
   (assert (or max-iters timeout-in-seconds))
   (assert players-number)
   (assert root-state)
@@ -110,16 +113,24 @@
          (root (make-node-for-state root-state
                                     :parent nil
                                     :player root-player))
-         (i 0))
+         (i 0)
+         (iterations-without-expansions 0))
     (loop while (and (< i max-iters)
                      (or (null stop-time)
-                         (< (get-internal-run-time) stop-time)))
-       do 
-         (multiple-value-bind (node state)
-             (selection-loop root (clone-state root-state) 0)
-           (incf i)
-           (backup node
-                   (estimate-state-rewards state (player node)))))
+                         (< (get-internal-run-time) stop-time))
+                     (or (null expand-node-exit-treshold)
+                         (< iterations-without-expansions
+                            expand-node-exit-treshold)))
+          do
+             (let ((*nodes-expanded* 0))
+               (multiple-value-bind (node state)
+                   (selection-loop root (clone-state root-state) 0)
+                 (if (= *nodes-expanded* 0)
+                     (incf iterations-without-expansions)
+                     (setf iterations-without-expansions 0))
+                 (incf i)
+                 (backup node
+                         (estimate-state-rewards state (player node))))))
     (values (when (children root)
               (get-best-move root))
             root)))
@@ -145,6 +156,7 @@
       (t (error "Should never reach this state")))))
 
 (defun expand-node (node state)
+  (incf *nodes-expanded*)
   (let* ((action (pop (unexplored-actions node)))
          (child-state (next-state state action))
          (child-node (make-node-for-state child-state
