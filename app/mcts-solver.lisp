@@ -350,7 +350,8 @@
                       :orig-state (make-initial-state)
                       :dislikes most-positive-fixnum))
          (solved-state (icfpc2021/a-star:a-star
-                        init-state)))
+                        init-state
+                        :timeout-in-seconds *timeout-in-seconds*)))
     (when solved-state
       (state-fixed-vertices (a-star-state-orig-state solved-state)))))
 

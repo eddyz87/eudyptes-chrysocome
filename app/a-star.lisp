@@ -19,13 +19,23 @@
 (defmethod state-hash-object (state)
   state)
 
-(defun a-star (initial-state &key (predicate #'<) hash-state? (state-hash-test #'eql))
+(defun a-star (initial-state &key
+                               (predicate #'<)
+                               hash-state?
+                               (state-hash-test #'eql)
+                               timeout-in-seconds)
   (let ((queue (pileup:make-heap predicate :key #'state-estimate))
         (visited (when hash-state?
-                   (make-hash-table :test state-hash-test))))
+                   (make-hash-table :test state-hash-test)))
+        (stop-time (when timeout-in-seconds
+                     (+ (get-internal-run-time)
+                        (* timeout-in-seconds
+                           internal-time-units-per-second)))))
     (pileup:heap-insert initial-state queue)
     (loop :for state := (pileup:heap-pop queue)
-          :while state
+          :while (and state
+                      (or (null stop-time)
+                          (< (get-internal-run-time) stop-time)))
           :do (if (final-state? state)
                   (return-from a-star state)
                   (loop :for next-state :in (next-states state)
@@ -48,7 +58,7 @@
   target)
 
 (defmethod next-states ((state test-state))
-  (format t "Next states for ~A~%" state)
+  ;; (format t "Next states for ~A~%" state)
   (with-slots (a b target) state
     (let ((a1 (1+ a))
           (b1 (1+ b)))
