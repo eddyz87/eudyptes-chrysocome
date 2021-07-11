@@ -1,1 +1,1 @@
-{"vertices":[[0,31],[24,33],[0,8],[25,10],[11,29]],"dislikes":341,"solver-info":{"type":"mcts","timeout":60,"exploration":0.7071067690849304,"reward-expr":"(/\n (+\n  (/ (COUNT-IF-NOT #'NULL (STATE-FIXED-VERTICES S))\n     (LENGTH (STATE-FIXED-VERTICES S)))\n  (/ 1 (1+ DISLIKES)))\n 2)"}}
+{"vertices":[[0,7],[0,31],[22,0],[22,38],[36,19]],"dislikes":0,"solver-info":{"type":"mcts","timeout":60,"exploration":0.7071067811865476,"reward-expr":"(/\n (+\n  (/ (COUNT-IF-NOT #'NULL (STATE-FIXED-VERTICES S))\n     (LENGTH (STATE-FIXED-VERTICES S)))\n  (/ 1 (1+ DISLIKES)))\n 2)"}}
