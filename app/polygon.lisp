@@ -210,7 +210,7 @@
               :b (point (p-x x2) (p-y y2)))
      (make-rectangle :lows (list (min x1 x2)
                                  (min y1 y2))
-                     :highs (list (max x2 x2)
+                     :highs (list (max x1 x2)
                                   (max y1 y2))))))
 
 (defun poly->tree (poly)
