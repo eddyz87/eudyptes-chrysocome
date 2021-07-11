@@ -226,19 +226,26 @@
      :do (loop :for (l r) :on intersections :by #'cddr
             :do (loop :for x :from (ceiling l) :to (floor r)
                    :do (setf (aref arr x y) 1)))
-     :finally (return arr))
-  )
+     :finally (return arr)))
 
 (defun unify-intersections (intersections)
-  (loop :for ((lx . li) (rx . ri)) :on (sort intersections #'< :key #'car)
-     :append (cond
-               ((null rx)
+  (labels ((%unify (intersections paint)
+             (ematch intersections
+               ((list (cons lx _))
                 (list lx))
-               ((/= lx rx)
-                (list lx))
-               ((eq ri li)
-                (list lx))
-               (t nil))))
+               ((list* (cons lx :middle) rest)
+                (cons lx (%unify rest (not paint))))
+               ((guard (list* (cons lx li) (cons rx ri) rest)
+                       (eq li ri))
+                (if paint
+                    (%unify rest paint)
+                    (list* lx rx (%unify rest paint))))
+               ((list* (cons lx _) (cons rx _) rest)
+                (if paint
+                    (cons rx (%unify rest (not paint)))
+                    (cons lx (%unify rest (not paint)))))
+               (nil nil))))
+    (%unify (sort intersections #'< :key #'car) nil)))
 
 (defun line->bound (line)
   (ematch line
@@ -385,20 +392,34 @@
   (ematch line
     ((segment :a (point (p-x x1) (p-y y1))
               :b (point (p-x x2) (p-y y2)))
-     (if (= x1 x2)
-         (loop :for y :from (min y1 y2) :to (max y1 y2)
-            :do (setf (aref raster x1 y) 1))
-         (let ((dx (1+ (abs (- x2 x1))))
-               (dy (1+ (abs (- y2 y1)))))
-           (loop :with sx := (signum (- x2 x1))
-              :with sy := (signum (- y2 y1))
-              :with y := y1
-              :with error := 0
-              :for x := x1 :then (+ x sx)
-              :while (/= x x2)
-              :do (setf (aref raster x y) 1)
-              :do (incf error dy)
-              :when (>= error dx)
-              :do (progn
-                    (incf y sy)
-                    (decf error dx))))))))
+     (let ((dx (1+ (abs (- x2 x1))))
+           (dy (1+ (abs (- y2 y1)))))
+       (cond
+         ((= x1 x2)
+          (loop :for y :from (min y1 y2) :to (max y1 y2)
+             :do (setf (aref raster x1 y) 1)))
+         ((>= dx dy)
+          (loop :with sx := (signum (- x2 x1))
+             :with sy := (signum (- y2 y1))
+             :with y := y1
+             :with error := 0
+             :for x := x1 :then (+ x sx)
+             :while (/= x x2)
+             :do (setf (aref raster x y) 1)
+             :do (incf error dy)
+             :when (>= error dx)
+             :do (progn
+                   (incf y sy)
+                   (decf error dx))))
+         (t (loop :with sx := (signum (- x2 x1))
+               :with sy := (signum (- y2 y1))
+               :with x := x1
+               :with error := 0
+               :for y := y1 :then (+ y sy)
+               :while (/= y y2)
+               :do (setf (aref raster x y) 1)
+               :do (incf error dx)
+               :when (>= error dy)
+               :do (progn
+                     (incf x sx)
+                     (decf error dy)))))))))
