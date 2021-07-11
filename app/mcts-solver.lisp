@@ -4,7 +4,8 @@
         #:icfpc2021/polygon
         #:icfpc2021/circle
         #:icfpc2021/shortest-paths
-        #:icfpc2021/mcts)
+        #:icfpc2021/mcts
+        #:alexandria)
   (:import-from #:alexandria
 		#:plist-hash-table)
   (:import-from #:icfpc2021/utils
@@ -14,7 +15,9 @@
                 #:bind)
   (:import-from #:icfpc2021/a-star)
   (:export #:mcts-solve
-           #:a-star-solve))
+           #:a-star-solve
+           #:a-star/mcts-solve
+           #:a-star/mcts-solver-info))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -48,44 +51,66 @@
 (defparameter *timeout-in-seconds* 60)
 (defparameter *exploration-coef* (sqrt 0.5))
 
-(defun mcts-solve (problem &key print-tree)
+
+(defun exec-with-problem-context (problem fn)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
                           :maximizing (max (p-x p) (p-y p))))
          (max-r (ceiling (* (sqrt 2) max-coord)))
-         (figure-vertices-num (length (problem-init-pos problem)))
-         (*complete/total-estimates* (cons 0 0))
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
          (*holy-raster* (rasterize-polygon* (problem-hole problem)))
          (*holy-tree* (poly->tree (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
-	 (root-state (make-initial-state))
-	 (mcts-root
+         (*complete/total-estimates* (cons 0 0)))
+    (funcall fn)))
+
+(defmacro with-problem-context (problem &body body)
+  `(exec-with-problem-context
+    ,problem
+    (lambda () ,@body)))
+
+(defun mcts-solve (problem &key print-tree)
+  (with-problem-context problem
+    (mcts-solve-aux
+     :figure-vertices-num (length (problem-init-pos problem))
+     :root-state (make-initial-state)
+     :print-tree print-tree)))
+
+(defun mcts-solve-aux (&key
+                         figure-vertices-num
+                         root-state
+                         print-tree
+                         early-exit-treshold)
+  (let* ((mcts-root
            (nth-value 1 (select-next-move :root-state root-state
                                           :root-player 0
                                           :players-number 1
                                           :max-iters (* 1000 1000)
                                           :timeout-in-seconds *timeout-in-seconds*
                                           :max-selection-depth figure-vertices-num
-                                          :exploration-coefficient *exploration-coef*)))
+                                          :exploration-coefficient *exploration-coef*
+                                          :expand-node-exit-treshold early-exit-treshold)))
          (best-score/solution nil))
 
     (when print-tree
       (let ((icfpc2021/mcts::*state->svg-func* #'mcts-state->svg))
-	(with-open-file (stream (format nil "~A/mcts.dot" (dir-pathname ".."))
-				:direction :output
-				:if-exists :supersede
-				:if-does-not-exist :create)
-	  (print-decision-tree stream mcts-root root-state
-			       :exploration-coefficient *exploration-coef*))))
+        (with-open-file (stream (format nil "~A/mcts.dot" (dir-pathname ".."))
+                                :direction :output
+                                :if-exists :supersede
+                                :if-does-not-exist :create)
+          (print-decision-tree stream mcts-root root-state
+                               :exploration-coefficient *exploration-coef*))))
     (format t "Need solution with ~A steps~%" figure-vertices-num)
-    (format t "Complete estimates ratio: ~1,3f~%" (/ (car *complete/total-estimates*)
-                                                     (cdr *complete/total-estimates*)))
+    (format t "Complete estimates ratio: ~1,3f~%"
+            (if (/= (cdr *complete/total-estimates*) 0)
+                (/ (car *complete/total-estimates*)
+                   (cdr *complete/total-estimates*))
+                0))
     (print-mcts-tree-stats mcts-root)
     (mapc-children-actions
      mcts-root
      (lambda (reverse-actions)
-       (let ((state (make-initial-state)))
+       (let ((state (clone-state root-state)))
          (when (= (length reverse-actions) figure-vertices-num)
            (loop :for action :in reverse-actions
                  :do (next-state state action))
@@ -132,7 +157,7 @@
         (incf (cdr *complete/total-estimates*))
         (vector
          (if complete?
-             (/ 1 (1+ dislikes))
+             (/ 10 (1+ dislikes))
              0))))))
 
 (defun make-initial-state ()
@@ -346,15 +371,11 @@
   (a-star-state-dislikes state))
 
 (defun a-star-solve (problem)
-  (let* ((max-coord (loop :for p :across (problem-hole problem)
-                          :maximizing (max (p-x p) (p-y p))))
-         (max-r (ceiling (* (sqrt 2) max-coord)))
-         (*problem* problem)
-         (*ring-table* (make-ring-hash-table max-r))
-         (*holy-raster* (rasterize-polygon* (problem-hole problem)))
-         (*holy-tree* (poly->tree (problem-hole problem)))
-         (*distance-matrix* (make-shortest-paths-matrix problem))
-	     (init-state (make-a-star-state
+  (with-problem-context problem
+    (a-star-solve-aux)))
+
+(defun a-star-solve-aux ()
+  (let* ((init-state (make-a-star-state
                       :orig-state (make-initial-state)
                       :dislikes most-positive-fixnum))
          (solved-state (icfpc2021/a-star:a-star
@@ -368,3 +389,151 @@
    (list
     "type" "a-star"
 	"estimate" "dislikes")))
+
+(defun compute-figure-vertex-costs (figure-points hole-points)
+  (loop
+    :with figure-vertex-costs := (make-array (length figure-points))
+    :for hole-point :across hole-points
+    :do (loop
+          :with min-dist := nil
+          :with min-figure-index := nil
+          :for figure-index :from 0
+          :for figure-point :across figure-points
+          :for dist := (dist-square hole-point figure-point)
+          :when (or (null min-dist)
+                    (< dist min-dist))
+            :do (setf min-dist dist
+                      min-figure-index figure-index)
+          :finally (incf (aref figure-vertex-costs min-figure-index)
+                         min-dist))
+    :finally (return figure-vertex-costs)))
+
+(defun compute-hole-distances (figure-points hole-points)
+  (loop
+    :with hole-distances := (make-array (length hole-points) :initial-element nil)
+    :for hole-index :from 0
+    :for hole-point :across hole-points
+    :do (setf (aref hole-distances hole-index)
+              (loop
+                :for figure-point :across figure-points
+                :when figure-point
+                  :minimizing (dist-square hole-point figure-point)))
+    :finally (return hole-distances)))
+
+(defun collect-vertices-from-point (index edges-array N)
+  (loop
+    :with queue := (list index)
+    :with result := (make-hash-table)
+    :while (and queue
+                (< (hash-table-count result) N))
+    :for i := (pop queue)
+    :do (unless (gethash i result)
+          (setf (gethash i result) t)
+          (setf queue (append queue (mapcar #'edge-vertex
+                                            (aref edges-array i)))))
+    :finally (return (hash-table-keys result))))
+
+(defun maximal-element-index (array &key (filter (constantly t)))
+  (loop
+    :with max-index := nil
+    :for index :from 0
+    :for elt :across array
+    :when (and (funcall filter elt index)
+               (or (null max-index)
+                   (> (aref array index)
+                      (aref array max-index))))
+      :do (setf max-index index)
+    :finally (return max-index)))
+
+(defun collect-frontier (fixed-vertices edges-array)
+  (loop
+    :with frontier := (make-hash-table)
+    :for i :from 0
+    :for f :across fixed-vertices
+    :for edges := (aref edges-array i)
+    :when f
+      :do (loop :for e :in edges
+                :for ev := (edge-vertex e)
+                :unless (aref fixed-vertices ev)
+                  :do (setf (gethash ev frontier) t))
+    :finally (return (hash-table-keys frontier))))
+
+(defparameter *a-star/mcts-refinement-group-size* 3)
+
+(defun a-star/mcts-solver-info ()
+  (plist-hash-table
+   (list
+    "type" "a-star/mcts"
+    "a-star-estimate" "dislikes"
+    "mcts-group-size" *a-star/mcts-refinement-group-size*)))
+
+(defun compute-solution-cost (fixed-vertices hole)
+  (loop :for c :across (compute-hole-distances fixed-vertices hole)
+        :summing c))
+
+(defun a-star/mcts-solve (problem)
+  (let ((figure-vertices-num (length (problem-init-pos problem)))
+        (start-time (get-internal-run-time)))
+    (with-problem-context problem
+      (labels
+          ((%refine-once (already-refined fixed-vertices)
+             (let* ((old-cost (compute-solution-cost fixed-vertices (problem-hole problem)))
+                    (_1 (format t "Trying to refine solution from ~A~%" old-cost))
+                    (vertice-costs (compute-figure-vertex-costs fixed-vertices (problem-hole problem)))
+                    (first-refinement-vertice (or (maximal-element-index
+                                                   vertice-costs
+                                                   :filter (lambda (elt idx)
+                                                             (and (not (gethash idx already-refined))
+                                                                  (/= 0 elt))))
+                                                  (progn
+                                                    (format t "No more refinement points~%")
+                                                    (return-from %refine-once fixed-vertices))))
+                    (refinement-vertices (collect-vertices-from-point first-refinement-vertice
+                                                                      (problem-edges problem)
+                                                                      *a-star/mcts-refinement-group-size*))
+                    (mcts-fixed-vertices (loop :with new-vertices := (subseq fixed-vertices 0)
+                                               :for index :in refinement-vertices
+                                               :do (setf (aref new-vertices index) nil)
+                                               :finally (return new-vertices)))
+                    (_2 (format t "going to refine vertices: ~A~%" refinement-vertices))
+                    (_3 (format t "frontier: ~A~%" (collect-frontier mcts-fixed-vertices
+                                                                     (problem-edges problem))))
+                    (mcts-state
+                      (make-state
+                       :fixed-vertices mcts-fixed-vertices
+                       :frontier (collect-frontier mcts-fixed-vertices (problem-edges problem))
+                       :nearest-figure-vertice-dist (compute-hole-distances mcts-fixed-vertices
+                                                                            (problem-hole problem))))
+                    (mcts-solution
+                      (let ((*timeout-in-seconds* (max 0
+                                                       (- *timeout-in-seconds*
+                                                          (floor
+                                                           (/ (- (get-internal-run-time)
+                                                                 start-time)
+                                                              internal-time-units-per-second))))))
+                        (format t "Using MCTS timeout ~A~%" *timeout-in-seconds*)
+                        (mcts-solve-aux
+                         :figure-vertices-num (length refinement-vertices)
+                         :root-state mcts-state
+                         :early-exit-treshold 100))))
+               (declare (ignore _1 _2 _3))
+               (setf (gethash first-refinement-vertice already-refined) t)
+               (if mcts-solution
+                   (let ((new-cost (compute-solution-cost mcts-solution (problem-hole problem))))
+                     (if (< new-cost old-cost)
+                         (progn
+                           (format t "MCTS refined to ~A~%" new-cost)
+                           mcts-solution)
+                         (progn
+                           (format t "Discarding MCTS solution with worse score ~A~%" new-cost)
+                           fixed-vertices)))
+                   (progn
+                     (format t "MCTS failed to refine~%")
+                     fixed-vertices)))))
+        (loop
+          :with already-refined := (make-hash-table)
+          :with fixed-vertices := (or (a-star-solve-aux)
+                                      (return-from a-star/mcts-solve nil))
+          :for i :below figure-vertices-num ;; TODO ???
+          :do (setf fixed-vertices (%refine-once already-refined fixed-vertices))
+          :finally (return fixed-vertices))))))
