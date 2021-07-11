@@ -39,6 +39,7 @@
 (defvar *problem*)
 (defvar *ring-table*)
 (defvar *holy-raster*)
+(defvar *holy-tree*)
 (defvar *distance-matrix*)
 
 (defvar *timeout-in-seconds* 60)
@@ -52,6 +53,7 @@
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
          (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
+         (*holy-tree* (poly->tree (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
 	 (root-state (make-initial-state))
 	 (mcts-root
@@ -216,20 +218,25 @@
                                :collect (cons edge-i hole-i))))
       (hole-for-vertices)))
 
-;; TODO: remove points that add intersections with hole edges !!!!
 (defun possible-positions (fixed-vertices free-vertex)
   (let* ((all-edges (edges free-vertex))
          (edges-to-fixed (remove-if-not (lambda (e) (aref fixed-vertices (edge-vertex e)))
                                         all-edges))
          (fixed-circles (mapcar (lambda (e)
-                                  (remove-if-not ;; filter by hole
+                                  (remove-if-not
                                    (lambda (point)
-                                     (when (and (>= (p-x point) 0)
-                                                (>= (p-y point) 0)
-                                                (< (p-x point) (array-dimension *holy-raster* 0))
-                                                (< (p-y point) (array-dimension *holy-raster* 1)))
-
-                                       (= 1 (aref *holy-raster* (p-x point) (p-y point)))))
+                                     (or
+                                      ;; filter by hole
+                                      (and (>= (p-x point) 0)
+                                           (>= (p-y point) 0)
+                                           (< (p-x point) (array-dimension *holy-raster* 0))
+                                           (< (p-y point) (array-dimension *holy-raster* 1))
+                                           (= 1 (aref *holy-raster* (p-x point) (p-y point))))
+                                      ;; filter by hole intersection
+                                      (null (line-intersect? (make-segment :a point
+                                                                           :b (aref fixed-vertices (edge-vertex e)))
+                                                             *holy-tree*
+                                                             *holy-raster*))))
                                    (points-in-ring (aref fixed-vertices (edge-vertex e))
                                                    (edge-len-square e)
                                                    (/ (problem-epsilon *problem*) (* 1000 1000))
