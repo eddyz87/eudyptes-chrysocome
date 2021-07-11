@@ -273,23 +273,37 @@
   (ematch line
     ((segment :a (point (p-x x1) (p-y y1))
               :b (point (p-x x2) (p-y y2)))
-     (if (= x1 x2)
-         (loop :for y :from (min y1 y2) :to (max y1 y2)
-            :always (= 1 (aref raster x1 y)))
-         (let ((dx (1+ (abs (- x2 x1))))
-               (dy (1+ (abs (- y2 y1)))))
-           (loop :with sx := (signum (- x2 x1))
-              :with sy := (signum (- y2 y1))
-              :with y := y1
-              :with error := 0
-              :for x := x1 :then (+ x sx)
-              :while (/= x x2)
-              :always (= 1 (aref raster x y))
-              :do (incf error dy)
-              :when (>= error dx)
-              :do (progn
-                    (incf y sy)
-                    (decf error dx))))))))
+     (let ((dx (1+ (abs (- x2 x1))))
+           (dy (1+ (abs (- y2 y1)))))
+       (cond
+         ((= dx 1)
+          (loop :for y :from (min y1 y2) :to (max y1 y2)
+             :always (= 1 (aref raster x1 y))))
+         ((>= dx dy)
+          (loop :with sx := (signum (- x2 x1))
+             :with sy := (signum (- y2 y1))
+             :with y := y1
+             :with error := 0
+             :for x := x1 :then (+ x sx)
+             :while (/= x x2)
+             :always (= 1 (aref raster x y))
+             :do (incf error dy)
+             :when (>= error dx)
+             :do (progn
+                   (incf y sy)
+                   (decf error dx))))
+         (t (loop :with sx := (signum (- x2 x1))
+               :with sy := (signum (- y2 y1))
+               :with x := x1
+               :with error := 0
+               :for y := y1 :then (+ y sy)
+               :while (/= y y2)
+               :always (= 1 (aref raster x y))
+               :do (incf error dx)
+               :when (>= error dy)
+               :do (progn
+                     (incf x sx)
+                     (decf error dy)))))))))
 
 (defun check-mid-point (line raster)
   (ematch line
