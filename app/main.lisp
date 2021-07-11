@@ -36,7 +36,8 @@
 	    (*solutions-dir* (or solutions-dir (dir-pathname "../solutions/")))
 	    (solvers (ecase solver
 		           (:all (list *mcts-solver-func*
-			                   *spring-solver-func*))
+                               ;; *spring-solver-func*
+                               *a-star-solver-func*))
 		           (:mcts (list *mcts-solver-func*))
 		           (:spring (list *spring-solver-func*))
                    (:a-star (list *a-star-solver-func*)))))
