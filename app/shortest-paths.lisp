@@ -19,7 +19,8 @@
                 (lambda (i1 p1 i2 p2 edge-len-square)
                   (declare (ignore p1 p2))
                   (setf (aref result i1 i2)
-                        (sqrt edge-len-square))))
+                        (sqrt (* edge-len-square (1+ (/ (problem-epsilon problem)
+                                                        (* 1000 1000))))))))
     (loop :for i :below num-vertices
           :do (setf (aref result i i) 0))
     (loop :for k :below num-vertices

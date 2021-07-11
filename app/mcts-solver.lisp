@@ -7,6 +7,11 @@
         #:icfpc2021/mcts)
   (:import-from #:alexandria
 		#:plist-hash-table)
+  (:import-from #:icfpc2021/utils
+		#:dir-pathname)
+  (:import-from #:icfpc2021/svg-drawer)
+  (:import-from :metabang-bind
+                #:bind)
   (:export #:mcts-solve))
 
 (in-package :icfpc2021/mcts-solver)
@@ -39,7 +44,7 @@
 (defvar *timeout-in-seconds* 60)
 (defvar *exploration-coef* (sqrt 0.5))
 
-(defun mcts-solve (problem)
+(defun mcts-solve (problem &key print-tree)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
                           :maximizing (max (p-x p) (p-y p))))
          (max-r (ceiling (* (sqrt 2) max-coord)))
@@ -48,8 +53,9 @@
          (*ring-table* (make-ring-hash-table max-r))
          (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
-         (mcts-root
-           (nth-value 1 (select-next-move :root-state (make-initial-state)
+	 (root-state (make-initial-state))
+	 (mcts-root
+           (nth-value 1 (select-next-move :root-state root-state
                                           :root-player 0
                                           :players-number 1
                                           :max-iters (* 1000 1000)
@@ -57,6 +63,16 @@
                                           :max-selection-depth figure-vertices-num
                                           :exploration-coefficient *exploration-coef*)))
          (best-score/solution nil))
+
+    (when print-tree
+      (let ((icfpc2021/mcts::*state->svg-func* #'mcts-state->svg))
+	(with-open-file (stream (format nil "~A/mcts.dot" (dir-pathname ".."))
+				:direction :output
+				:if-exists :supersede
+				:if-does-not-exist :create)
+	  (print-decision-tree stream mcts-root root-state
+			       :exploration-coefficient *exploration-coef*))))
+
     (mapc-children-actions
      mcts-root
      (lambda (reverse-actions)
@@ -151,10 +167,27 @@
       ;; (vertice-for-holes)
       (select-initial-vertices)
       (with-slots (fixed-vertices frontier) s
-        (loop
-          :for free-vertex :in frontier
-          :append (loop :for position :in (possible-positions fixed-vertices free-vertex)
-                        :collect (cons free-vertex position))))))
+        ;; (when frontier
+        ;;   (let* ((free-vertex (car frontier))
+        ;;          (actions
+        ;;            (loop :for position :in (possible-positions fixed-vertices free-vertex)
+        ;;                  :collect (cons free-vertex position))))
+        ;;     (format t "State ~A: ~A~%" fixed-vertices actions)
+        ;;     actions))
+        (let* ((vertex-actions
+                 (loop
+                   :for free-vertex :in frontier
+                   :collect (cons free-vertex
+                                  (loop :for position :in (possible-positions fixed-vertices free-vertex)
+                                        :collect position))))
+               (best-action (alexandria:extremum vertex-actions
+                                                 #'<
+                                                 :key (lambda (action)
+                                                        (length (cdr action))))))
+          ;; (format t "State ~A: ~A~%" fixed-vertices best-action)
+          (mapcar (lambda (act)
+                    (cons (car best-action) act))
+                  (cdr best-action))))))
 
 (defun same-distance? (d1 d2)
   (<= (* (abs (1- (/ d1 d2)))
@@ -195,6 +228,7 @@
                                                 (>= (p-y point) 0)
                                                 (< (p-x point) (array-dimension *holy-raster* 0))
                                                 (< (p-y point) (array-dimension *holy-raster* 1)))
+
                                        (= 1 (aref *holy-raster* (p-x point) (p-y point)))))
                                    (points-in-ring (aref fixed-vertices (edge-vertex e))
                                                    (edge-len-square e)
@@ -235,3 +269,29 @@
 	 "timeout" *timeout-in-seconds*
 	 "exploration" *exploration-coef*
 	 "reward-expr" (format nil "~A" *reward-expr*))))
+
+(defun mcts-state->svg (state filename)
+  (labels ((%point->list (p)
+	     (when p (list (p-x p) (p-y p)))))
+    (let* ((problem (solution->parsed-problem *problem* (problem-init-pos *problem*)))
+	   (hole (icfpc2021/problem-defs:problem-hole problem))
+	   (vertices (remove nil (map 'list #'%point->list
+				      (icfpc2021/mcts-solver::state-fixed-vertices state)))))
+      (bind (((max-width . max-height)
+	      (bind (((max-x-1 . max-y-1) (icfpc2021/svg-drawer::get-dimentions hole))
+		     ((max-x-2 . max-y-2) (icfpc2021/svg-drawer::get-dimentions-from-vertices-list
+					   vertices)))
+		(cons (max max-x-1 max-x-2)
+		      (max max-y-1 max-y-2)))))
+	(icfpc2021/svg-drawer::with-svg-to-file
+	    (scene 'cl-svg:svg-1.2-toplevel
+		   :height (+ max-height 5)
+		   :width (+ max-width 5))
+	    (filename :if-exists :supersede)
+	  (icfpc2021/svg-drawer::draw-hole scene hole)
+	  (loop :for edge :in (icfpc2021/problem-defs:figure-edges
+			       (icfpc2021/problem-defs:problem-figure problem))
+		:for start := (nth (first edge) vertices)
+		:for end := (nth (second edge) vertices)
+		:when (and start end)
+		  :do (icfpc2021/svg-drawer::draw-line-segment scene start end :stroke "red")))))))

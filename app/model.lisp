@@ -45,6 +45,9 @@
   (x 0)
   (y 0))
 
+(defmethod print-object ((p point) stream)
+  (format stream "<~A, ~A>" (p-x p) (p-y p)))
+
 (defstruct (vec (:conc-name v-))
   (x 0)
   (y 0))

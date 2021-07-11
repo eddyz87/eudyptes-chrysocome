@@ -88,3 +88,4 @@
 ;; (defun draw-point (scene point)
 ;;   (draw scene (:circle :cx (get-x (x point)) :cy (get-y (y point)) :r 2)))
  
+
