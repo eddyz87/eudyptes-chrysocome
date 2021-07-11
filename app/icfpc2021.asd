@@ -6,3 +6,4 @@
 	       :icfpc2021/visualizer))
 
 (register-system-packages :aserve '(:net.aserve :net.html.generator))
+(register-system-packages :spatial-trees '(:rectangles))
