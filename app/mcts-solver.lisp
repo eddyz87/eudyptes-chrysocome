@@ -235,13 +235,13 @@
          (fixed-circles (mapcar (lambda (e)
                                   (remove-if-not
                                    (lambda (point)
-                                     (or
+                                     (and
                                       ;; filter by hole
-                                      (and (>= (p-x point) 0)
-                                           (>= (p-y point) 0)
-                                           (< (p-x point) (array-dimension *holy-raster* 0))
-                                           (< (p-y point) (array-dimension *holy-raster* 1))
-                                           (= 1 (aref *holy-raster* (p-x point) (p-y point))))
+                                      (>= (p-x point) 0)
+                                      (>= (p-y point) 0)
+                                      (< (p-x point) (array-dimension *holy-raster* 0))
+                                      (< (p-y point) (array-dimension *holy-raster* 1))
+                                      (= 1 (aref *holy-raster* (p-x point) (p-y point)))
                                       ;; filter by hole intersection
                                       (null (line-intersect? (make-segment :a point
                                                                            :b (aref fixed-vertices (edge-vertex e)))
@@ -344,6 +344,7 @@
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
          (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
+         (*holy-tree* (poly->tree (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
 	     (init-state (make-a-star-state
                       :orig-state (make-initial-state)
