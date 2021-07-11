@@ -164,13 +164,31 @@
 (defmethod possible-actions (s _)
   (declare (ignore _))
   (if (state-initial? s)
-      (loop :for hole-point :across (problem-hole *problem*)
-            :collect (cons 0 hole-point))
+      ;; (loop :for hole-point :across (problem-hole *problem*)
+      ;;       :collect (cons 0 hole-point))
+      (select-initial-vertices)
       (with-slots (fixed-vertices frontier) s
         (loop
           :for free-vertex :in frontier
           :append (loop :for position :in (possible-positions fixed-vertices free-vertex)
                         :collect (cons free-vertex position))))))
+
+(defun same-distance? (d1 d2)
+  (<= (* (abs (1- (/ d1 d2)))
+         1000000)
+      (problem-epsilon *problem*)))
+
+(defun select-initial-vertices ()
+  (loop :with hole := (problem-hole *problem*)
+     :for i :from 0 :below (length hole)
+     :for hole-i := (aref hole i)
+     :for hole-j := (aref hole (mod (1+ i) (length hole)))
+     :for dist := (dist-square hole-i hole-j)
+     :append (loop :with edges := (problem-edges *problem*)
+                :for edge-i :from 0 :below (length edges)
+                :append (loop :for edge :in (aref edges edge-i)
+                           :when (same-distance? dist (edge-len-square edge))
+                           :collect (cons edge-i hole-i)))))
 
 ;; TODO: remove points that add intersections with hole edges !!!!
 (defun possible-positions (fixed-vertices free-vertex)
