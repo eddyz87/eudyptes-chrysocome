@@ -2,20 +2,23 @@
     (:use #:cl
           #:icfpc2021/model
           #:icfpc2021/mcts-solver
-	  #:icfpc2021/parse
-	  #:icfpc2021/utils)
+          #:icfpc2021/parse
+          #:icfpc2021/utils)
   (:import-from #:icfpc2021/problem-defs
-		#:make-saved-solution
-		#:saved-solution-dislikes
-		#:saved-solution-solver-info
-		#:saved-solution->ht)
+                #:make-saved-solution
+                #:saved-solution-dislikes
+                #:saved-solution-solver-info
+                #:saved-solution-vertices
+                #:saved-solution->ht)
   (:import-from #:icfpc2021/polygon)
   (:import-from #:icfpc2021/http)
   (:import-from #:icfpc2021/score)
   (:import-from #:icfpc2021/solver)
   (:import-from #:alexandria
-		#:plist-hash-table
-		#:hash-table-plist))
+                #:plist-hash-table
+                #:hash-table-plist)
+  (:export #:main
+           #:post-saved-solutions))
 
 (in-package :icfpc2021/main)
 
@@ -114,3 +117,11 @@
                 (format t "Solution found for ~A: ~A~%" (problem-id-from-filename file)
                         dislikes)
                 (icfpc2021/http:post-solution (problem-id-from-filename file) solution)))))
+
+(defun post-saved-solutions (&optional (dir (asdf:system-relative-pathname :icfpc2021 "../solutions/")))
+  (loop :for file :in (uiop:directory-files dir)
+     :for solution := (load-saved-solution file)
+     :when solution
+     :do (icfpc2021/http:post-solution
+          (parse-integer (cl-ppcre:scan-to-strings "[0-9]+" (pathname-name file)))
+          (saved-solution-vertices solution))))
