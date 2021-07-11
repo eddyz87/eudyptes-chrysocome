@@ -19,7 +19,11 @@
            #:poly->tree
            #:line-intersect?
            #:rasterize-problem
-           #:rasterize-polygon))
+           #:rasterize-polygon
+           #:rasterize-polygon*
+           #:visualize-poly
+           #:visualize-solution
+           ))
 
 (in-package :icfpc2021/polygon)
 
@@ -98,7 +102,10 @@
                    ( 20 07 t)
                    ( 05 20 t)
                    ( 20 20 nil)))
-         (raster (rasterize-polygon 32 32 poly)))
+         (raster (rasterize-polygon* poly)))
+    (loop :for p :across poly
+       :unless (= 1 (aref raster (p-x p) (p-y p)))
+       :do (format t "Bad answer for ~A ~A~%" (p-x p) (p-y p)))
     (loop
       :with (mx my) := (array-dimensions raster)
       :for y :from (1- my) :downto 0
@@ -170,39 +177,68 @@
     (t :ok)))
 
 (defun rasterize-problem (problem)
-  (let* ((max-coord (loop :for p :across (problem-hole problem)
-                       :maximizing (max (p-x p) (p-y p))))
-         (max-r (ceiling (* (sqrt 2) max-coord))))
-    (rasterize-polygon max-r max-r (problem-hole problem))))
+  (rasterize-polygon* (problem-hole problem)))
+
+(defun rasterize-polygon* (poly)
+  (loop :for p :across poly
+     :maximizing (p-x p) :into mx
+     :maximizing (p-y p) :into my
+     :finally (return (rasterize-polygon (1+ mx) (1+ my) poly))))
 
 (defun rasterize-polygon (max-x max-y poly)
+  (rasterize-fast max-x max-y poly))
+
+(defun rasterize-correct (max-x max-y poly)
+  (loop :with arr := (make-array (list max-x max-y) :element-type 'bit)
+     :for x :from 0 :below max-x
+     :do (loop :for y :from 0 :below max-y
+            :when (point-in-polygon? (make-point :x x :y y) poly)
+            :do (setf (aref arr x y) 1))
+     :finally (return arr)))
+
+(defun rasterize-fast (max-x max-y poly)
   (loop
-    :with arr := (make-array (list max-x max-y) :element-type 'bit)
-    :for y :below max-y
-    :for intersections
-      := (loop
-           :with intersections
-           :for i :below (length poly)
-           :for a := (aref poly i)
-           :for b := (aref poly (mod (1+ i) (length poly)))
-           :do (bind (((:structure p- (ax x) (ay y)) a)
-                      ((:structure p- (bx x) (by y)) b)
-                      (dx (- bx ax))
-                      (dy (- by ay)))
-                 (when (<= (min ay by) y (max ay by))
-                   (cond ((= dx 0)
-                          (push ax intersections))
-                         ((= dy 0)
-                          ;; no intersection
-                          )
-                         (t (let ((x (+ ax (* (/ dx dy) (- y ay)))))
-                              (push x intersections))))))
-           :finally (return (sort intersections #'<)))
-    :do (loop :for (l r) :on intersections :by #'cddr
-              :when (and l r)
-                :do (loop :for x :from (ceiling l) :to (floor r)
-                          :do (setf (aref arr x y) 1)))
-    :finally (return arr)))
+     :with arr := (make-array (list max-x max-y) :element-type 'bit)
+     :for y :below max-y
+     :for intersections
+       := (loop
+             :with intersections
+             :for i :below (length poly)
+             :for a := (aref poly i)
+             :for b := (aref poly (mod (1+ i) (length poly)))
+             :do (bind (((:structure p- (ax x) (ay y)) a)
+                        ((:structure p- (bx x) (by y)) b)
+                        (dx (- bx ax))
+                        (dy (- by ay))
+                        (ind (cond
+                               ((= y (min ay by)) :min)
+                               ((= y (max ay by)) :max)
+                               (t :middle))))
+                   (when (<= (min ay by) y (max ay by))
+                     (cond ((= dx 0)
+                            (push (cons ax ind) intersections))
+                           ((= dy 0)
+                            ;; no intersection
+                            )
+                           (t (let ((x (+ ax (* (/ dx dy) (- y ay)))))
+                                (push (cons x ind) intersections))))))
+             :finally (return (unify-intersections intersections)))
+     :do (loop :for (l r) :on intersections :by #'cddr
+            :do (loop :for x :from (ceiling l) :to (floor r)
+                   :do (setf (aref arr x y) 1)))
+     :finally (return arr))
+  )
+
+(defun unify-intersections (intersections)
+  (loop :for ((lx . li) (rx . ri)) :on (sort intersections #'< :key #'car)
+     :append (cond
+               ((null rx)
+                (list lx))
+               ((/= lx rx)
+                (list lx))
+               ((eq ri li)
+                (list lx))
+               (t nil))))
 
 (defun line->bound (line)
   (ematch line
@@ -288,3 +324,67 @@
                        raster)
        :unless (eq expected result)
        :do (format t "Bad answer: ~A~%" (nth i lines)))))
+
+(defun visualize-poly (poly)
+  (let ((raster (rasterize-polygon* poly)))
+    (terpri)
+    (loop :with (mx my) := (array-dimensions raster)
+       :for y :from 0 :below my
+       :do (loop :for x :from 0 :below mx
+              :do (princ (if (= 1 (aref raster x y))
+                             "x"
+                             ".")))
+         (terpri))))
+
+(defun visualize-solution (problem solution)
+  (let* ((poly (rasterize-polygon* (problem-hole problem)))
+         (edges (rasterize-solution (problem-edges problem) solution poly)))
+    (terpri)
+    (loop :with (mx my) := (array-dimensions poly)
+       :for y :from 0 :below my
+       :do (loop :for x :from 0 :below mx
+              :do (princ (cond
+                           ((and (= 1 (aref edges x y))
+                                 (= 1 (aref poly x y)))
+                            "o")
+                           ((= 1 (aref edges x y))
+                            "?")
+                           ((= 1 (aref poly x y))
+                            ".")
+                           (t " "))))
+         (terpri))))
+
+(defun rasterize-solution (edges-list-array vertices raster)
+  (let ((raster (make-array (array-dimensions raster) :element-type 'bit)))
+    (loop :for edges-list :across edges-list-array
+       :for ind :from 0
+       :do (loop :for edge :in edges-list
+              :when (> (edge-vertex edge)
+                       ind)
+              :do (rasterize-line (make-segment
+                                   :a (aref vertices ind)
+                                   :b (aref vertices (edge-vertex edge)))
+                                  raster)))
+    raster))
+
+(defun rasterize-line (line raster)
+  (ematch line
+    ((segment :a (point (p-x x1) (p-y y1))
+              :b (point (p-x x2) (p-y y2)))
+     (if (= x1 x2)
+         (loop :for y :from (min y1 y2) :to (max y1 y2)
+            :do (setf (aref raster x1 y) 1))
+         (let ((dx (1+ (abs (- x2 x1))))
+               (dy (1+ (abs (- y2 y1)))))
+           (loop :with sx := (signum (- x2 x1))
+              :with sy := (signum (- y2 y1))
+              :with y := y1
+              :with error := 0
+              :for x := x1 :then (+ x sx)
+              :while (/= x x2)
+              :do (setf (aref raster x y) 1)
+              :do (incf error dy)
+              :when (>= error dx)
+              :do (progn
+                    (incf y sy)
+                    (decf error dx))))))))

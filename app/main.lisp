@@ -25,9 +25,13 @@
 (defvar *problems-dir*)
 (defvar *solutions-dir*)
 
-(defvar *mcts-solver-func* #'icfpc2021/mcts-solver:mcts-solve)
-(defvar *a-star-solver-func* #'icfpc2021/mcts-solver:a-star-solve)
-(defvar *spring-solver-func*
+(defparameter *mcts-solver-func*
+  (lambda (problem)
+    (icfpc2021/mcts-solver:mcts-solve problem)))
+(defparameter *a-star-solver-func*
+  (lambda (problem)
+    (icfpc2021/mcts-solver:a-star-solve problem)))
+(defparameter *spring-solver-func*
   (lambda (problem)
     (icfpc2021/solver::solve problem :max-iters 100)))
 
@@ -95,6 +99,9 @@
                           solution))))
     (unless solution
       (error "Solution not found"))
+    ;; (icfpc2021/polygon:visualize-poly (problem-hole p))
+    ;; (terpri)
+    ;; (icfpc2021/polygon:visualize-solution p solution)
     (ecase (icfpc2021/polygon:check-solution p solution)
       (:ok nil)
       (:length-missmatch (error "Length missmatch"))

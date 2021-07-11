@@ -56,7 +56,7 @@
          (*complete/total-estimates* (cons 0 0))
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
-         (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
+         (*holy-raster* (rasterize-polygon* (problem-hole problem)))
          (*holy-tree* (poly->tree (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
 	 (root-state (make-initial-state))
@@ -351,7 +351,7 @@
          (max-r (ceiling (* (sqrt 2) max-coord)))
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
-         (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
+         (*holy-raster* (rasterize-polygon* (problem-hole problem)))
          (*holy-tree* (poly->tree (problem-hole problem)))
          (*distance-matrix* (make-shortest-paths-matrix problem))
 	     (init-state (make-a-star-state
