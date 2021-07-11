@@ -126,7 +126,7 @@
 
 (defun pose-in-polygon? (vertices edges-list-array tree raster)
   (and (loop :for v :across vertices
-          :always (aref raster (p-x v) (p-y v)))
+          :always (= 1 (aref raster (p-x v) (p-y v))))
        (loop :for edges-list :across edges-list-array
           :for ind :from 0
           :do (loop :for edge :in edges-list
@@ -225,9 +225,11 @@
   (some (lambda (holy-line)
           (multiple-value-bind (intersect? non-strict?)
               (lines-intersect? line holy-line)
-            (if non-strict?
-                (check-mid-point line raster)
-                intersect?)))
+            ;; (if non-strict?
+            ;;     (check-mid-point line raster)
+            ;;     intersect?)
+            (and (not non-strict?)
+                 intersect?)))
         (search line poly-tree)))
 
 (defun check-mid-point (line raster)

@@ -186,6 +186,10 @@
         ;;                  :collect (cons free-vertex position))))
         ;;     (format t "State ~A: ~A~%" fixed-vertices actions)
         ;;     actions))
+        ;; (loop
+        ;;   :for free-vertex :in frontier
+        ;;   :append (loop :for position :in (possible-positions fixed-vertices free-vertex)
+        ;;                 :collect (cons free-vertex position)))
         (let* ((vertex-actions
                  (loop
                    :for free-vertex :in frontier
@@ -199,7 +203,8 @@
           ;; (format t "State ~A: ~A~%" fixed-vertices best-action)
           (mapcar (lambda (act)
                     (cons (car best-action) act))
-                  (cdr best-action))))))
+                  (cdr best-action)))
+        )))
 
 (defun same-distance? (d1 d2)
   (<= (* (abs (1- (/ d1 d2)))
@@ -241,18 +246,21 @@
                                       (>= (p-y point) 0)
                                       (< (p-x point) (array-dimension *holy-raster* 0))
                                       (< (p-y point) (array-dimension *holy-raster* 1))
-                                      (= 1 (aref *holy-raster* (p-x point) (p-y point)))
-                                      ;; filter by hole intersection
-                                      (null (line-intersect? (make-segment :a point
-                                                                           :b (aref fixed-vertices (edge-vertex e)))
-                                                             *holy-tree*
-                                                             *holy-raster*))))
+                                      (= 1 (aref *holy-raster* (p-x point) (p-y point)))))
                                    (points-in-ring (aref fixed-vertices (edge-vertex e))
                                                    (edge-len-square e)
                                                    (/ (problem-epsilon *problem*) (* 1000 1000))
                                                    *ring-table*)))
                                 edges-to-fixed))
-         (possible-locations (intersect-point-sets fixed-circles)))
+         (fixed-circles-intersections (intersect-point-sets fixed-circles))
+         (possible-locations (loop :for point :in fixed-circles-intersections
+                                   :when (loop :for edge :in edges-to-fixed
+                                               :for connected-point := (aref fixed-vertices (edge-vertex edge))
+                                               :never (line-intersect? (make-segment :a connected-point
+                                                                                     :b point)
+                                                                       *holy-tree*
+                                                                       *holy-raster*))
+                                     :collect point)))
     (loop
       :with L-index := free-vertex
       :for L :in possible-locations
