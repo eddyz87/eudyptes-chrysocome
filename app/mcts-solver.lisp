@@ -42,15 +42,17 @@
 (defvar *ring-table*)
 (defvar *holy-raster*)
 (defvar *distance-matrix*)
+(defvar *complete/total-estimates*)
 
-(defvar *timeout-in-seconds* 60)
-(defvar *exploration-coef* (sqrt 0.5))
+(defparameter *timeout-in-seconds* 60)
+(defparameter *exploration-coef* (sqrt 0.5))
 
 (defun mcts-solve (problem &key print-tree)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
                           :maximizing (max (p-x p) (p-y p))))
          (max-r (ceiling (* (sqrt 2) max-coord)))
          (figure-vertices-num (length (problem-init-pos problem)))
+         (*complete/total-estimates* (cons 0 0))
          (*problem* problem)
          (*ring-table* (make-ring-hash-table max-r))
          (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
@@ -74,7 +76,10 @@
 				:if-does-not-exist :create)
 	  (print-decision-tree stream mcts-root root-state
 			       :exploration-coefficient *exploration-coef*))))
-
+    (format t "Need solution with ~A steps~%" figure-vertices-num)
+    (format t "Complete estimates ratio: ~1,3f~%" (/ (car *complete/total-estimates*)
+                                                     (cdr *complete/total-estimates*)))
+    (print-mcts-tree-stats mcts-root)
     (mapc-children-actions
      mcts-root
      (lambda (reverse-actions)
@@ -99,14 +104,12 @@
 (defun edges (vertex)
   (aref (problem-edges *problem*) vertex))
 
-(eval-when (:compile-toplevel :load-toplevel)
-  (defvar *reward-expr*
-    `(/ (+
-	 ;; share of fixed vertices 0 -> 1
-	 (/ (count-if-not #'null (state-fixed-vertices s))
-            (length (state-fixed-vertices s)))
-	 (/ 1 (1+ dislikes)))
-	2)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *reward-expr* nil))
+
+(defmacro capture-reward-expr (&body body)
+  (setf *reward-expr* body)
+  `(progn ,@body))
 
 (defun state-dislikes (s)
   (reduce #'+ (state-nearest-figure-vertice-dist s)
@@ -114,19 +117,21 @@
 
 (defmethod estimate-state-rewards (s _)
   (declare (ignore _))
-  ;; added dist square to the neares
-  (let ((dislikes (state-dislikes s)))
-    (macrolet ((%compute () `,*reward-expr*))
-	(vector (%compute)
-	     
-	     ;; (/ (+
-	     ;;     ;; share of fixed vertices 0 -> 1
-	     ;;     (/ (count-if-not #'null (state-fixed-vertices s))
-	     ;;        (length (state-fixed-vertices s)))
-	     ;;     (/ 1
-	     ;;        (1+ dislikes)))
-	     ;;    2)
-	     ))))
+  (capture-reward-expr
+    (let ((s (clone-state s)))
+      (loop :for actions := (possible-actions s 0)
+            :while actions
+            :do (next-state s (nth (random (length actions))
+                                   actions)))
+      (let ((complete? (notany #'null (state-fixed-vertices s)))
+            (dislikes (state-dislikes s)))
+        (when complete?
+          (incf (car *complete/total-estimates*)))
+        (incf (cdr *complete/total-estimates*))
+        (vector
+         (if complete?
+             (/ 1 (1+ dislikes))
+             0))))))
 
 (defun make-initial-state ()
   (make-state
