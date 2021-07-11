@@ -44,7 +44,7 @@
 (defvar *timeout-in-seconds* 60)
 (defvar *exploration-coef* (sqrt 0.5))
 
-(defun mcts-solve (problem)
+(defun mcts-solve (problem &key print-tree)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
                           :maximizing (max (p-x p) (p-y p))))
          (max-r (ceiling (* (sqrt 2) max-coord)))
@@ -64,13 +64,14 @@
                                           :exploration-coefficient *exploration-coef*)))
          (best-score/solution nil))
 
-    (let ((icfpc2021/mcts::*state->svg-func* #'mcts-state->svg))
-      (with-open-file (stream (format nil "~A/mcts.dot" (dir-pathname ".."))
-			      :direction :output
-			      :if-exists :supersede
-			      :if-does-not-exist :create)
-	(print-decision-tree stream mcts-root root-state
-			     :exploration-coefficient *exploration-coef*)))
+    (when print-tree
+      (let ((icfpc2021/mcts::*state->svg-func* #'mcts-state->svg))
+	(with-open-file (stream (format nil "~A/mcts.dot" (dir-pathname ".."))
+				:direction :output
+				:if-exists :supersede
+				:if-does-not-exist :create)
+	  (print-decision-tree stream mcts-root root-state
+			       :exploration-coefficient *exploration-coef*))))
 
     (mapc-children-actions
      mcts-root
