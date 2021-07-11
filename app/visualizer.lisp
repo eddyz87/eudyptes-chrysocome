@@ -5,11 +5,14 @@
 	  #:icfpc2021/svg-drawer
 	  #:icfpc2021/parse
 	  #:icfpc2021/problem-defs
-	  )
+	  #:icfpc2021/utils)
   (:import-from #:icfpc2021/model
                 #:solution->parsed-problem)
   (:import-from #:icfpc2021/solver)
+  (:import-from #:icfpc2021/main)
+  (:import-from #:icfpc2021/mcts-solver)
   (:import-from #:cl-svg)
+  (:import-from #:cl-ppcre)
   (:import-from #:metabang-bind
 		#:bind)
   (:import-from #:trivia
@@ -72,14 +75,9 @@
 		 :text-align "center")
          (mapcar #'html-row-for-solution solutions))))
 
-(defun problem-id (file)
-  (cl-ppcre:register-groups-bind (num-str)
-      ("problem_([0-9]+)" (pathname-name file))
-    (parse-integer num-str)))
-
 (defun sort-problems (files)
   (loop :for path :in files
-        :for num := (problem-id path)
+        :for num := (problem-id-from-filename path)
         :if num
           :collect (cons num path) :into num-problems
         :else
@@ -89,28 +87,31 @@
 
 (defun solve-all (solutions &key (hook-iters 100))
   (loop :for problem-file :in (sort-problems (uiop:directory-files (asdf:system-relative-pathname :icfpc2021 "../problems/")))
-     :collect (ematch (parse-json-file problem-file)
-                ((problem :hole hole :figure figure)
-                 (multiple-value-bind (solution dislikes massacred-problem)
-                     (ignore-errors
-                       (let ((iter 0))
-                         (icfpc2021/solver::solve-file problem-file
-                                                       :max-iters 1000
-                                                       :hook (lambda (problem solution)
-                                                               (when (zerop (mod (incf iter) hook-iters))
-                                                                 (push (solution->parsed-problem problem solution)
-                                                                       (gethash (problem-id problem-file) solutions)))))))
-                   
-                   (let ((message (if solution
-                                      (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
-                                      (format nil "~A<br/>~%Failed ~A~%" problem-file dislikes))))
-                     ;;(format t "~A~%" message)
-                     (list (hole->svg-string hole)
-                           (figure->svg-string figure)
-                           (if solution
-                               (solution->svg-string massacred-problem)
-                               (format nil "<a href=\"/~A\">Run</a>" (problem-id problem-file)))
-                           message)))))))
+	:collect (ematch (parse-json-file problem-file)
+                   ((problem :hole hole :figure figure)
+                    (multiple-value-bind (solution dislikes massacred-problem)
+			(ignore-errors
+			 ;; (let ((iter 0))
+                         ;;   (icfpc2021/solver::solve-file
+			 ;;    problem-file
+                         ;;    :max-iters 1000
+                         ;;    :hook (lambda (problem solution)
+                         ;;            (when (zerop (mod (incf iter) hook-iters))
+                         ;;              (push (solution->parsed-problem problem solution)
+                         ;;                    (gethash (problem-id-from-filename problem-file) solutions))))))
+			 ;;
+			 (format t "solving ~A~%" problem-file)
+			 (icfpc2021/main::solve-file #'icfpc2021/mcts-solver::mcts-solve problem-file))
+		      (let ((message (if solution
+					 (format nil "~A<br/>Dislikes: ~A~%" problem-file dislikes)
+					 (format nil "~A<br/>~%Failed ~A~%" problem-file dislikes))))
+			(format t "~A~%" message)
+			(list (hole->svg-string hole)
+			      (figure->svg-string figure)
+			      (if solution
+				  (solution->svg-string massacred-problem)
+				  (format nil "<a href=\"/~A\">Run</a>" (problem-id-from-filename problem-file)))
+			      message)))))))
 
 (defun visualizer-main (&key (port 8888) (hook-iters 100))
   (let ((solutions (make-hash-table)))

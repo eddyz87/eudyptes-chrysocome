@@ -1,9 +1,10 @@
 (uiop:define-package :icfpc2021/parse
-    (:use #:cl #:icfpc2021/problem-defs)
+    (:use #:cl #:anaphora #:icfpc2021/problem-defs)
   (:import-from :yason)
   (:import-from :uiop)
   (:export #:parse-json-string
-           #:parse-json-file))
+           #:parse-json-file
+	   #:load-saved-solution))
 
 (in-package :icfpc2021/parse)
 
@@ -21,3 +22,11 @@
                   :figure (make-figure :edges figure-edges
                                        :vertices figure-vertices)
                   :epsilon epsilon)))
+
+(defun load-saved-solution (file-name)
+  (when (probe-file file-name)
+    (let ((ht (yason:parse (uiop:read-file-string file-name))))
+      (make-saved-solution
+       :vertices (gethash "vertices" ht)
+       :dislikes (gethash "dislikes" ht)
+       :solver-info (gethash "solver-info" ht)))))

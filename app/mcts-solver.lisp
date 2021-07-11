@@ -5,6 +5,8 @@
         #:icfpc2021/circle
         #:icfpc2021/shortest-paths
         #:icfpc2021/mcts)
+  (:import-from #:alexandria
+		#:plist-hash-table)
   (:export #:mcts-solve))
 
 (in-package :icfpc2021/mcts-solver)
@@ -34,6 +36,9 @@
 (defvar *holy-raster*)
 (defvar *distance-matrix*)
 
+(defvar *timeout-in-seconds* 15)
+(defvar *exploration-coef* (sqrt 0.5))
+
 (defun mcts-solve (problem)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
                           :maximizing (max (p-x p) (p-y p))))
@@ -48,9 +53,9 @@
                                           :root-player 0
                                           :players-number 1
                                           :max-iters (* 1000 1000)
-                                          :timeout-in-seconds 60
+                                          :timeout-in-seconds *timeout-in-seconds*
                                           :max-selection-depth figure-vertices-num
-                                          :exploration-coefficient (sqrt 0.5))))
+                                          :exploration-coefficient *exploration-coef*)))
          (best-score/solution nil))
     (mapc-children-actions
      mcts-root
@@ -76,19 +81,31 @@
 (defun edges (vertex)
   (aref (problem-edges *problem*) vertex))
 
+(eval-when (:compile-toplevel :load-toplevel)
+  (defvar *reward-expr*
+    `(/ (+
+	 ;; share of fixed vertices 0 -> 1
+	 (/ (count-if-not #'null (state-fixed-vertices s))
+            (length (state-fixed-vertices s)))
+	 (/ 1 (1+ dislikes)))
+	2)))
+
 (defmethod estimate-state-rewards (s _)
   (declare (ignore _))
   ;; added dist square to the neares
   (let ((dislikes (reduce #'+ (state-nearest-figure-vertice-dist s)
                           :initial-value 0)))
-    (vector
-     (/ (+
-         ;; share of fixed vertices 0 -> 1
-         (/ (count-if-not #'null (state-fixed-vertices s))
-            (length (state-fixed-vertices s)))
-         (/ 1
-            (1+ dislikes)))
-        2))))
+    (macrolet ((%compute () `,*reward-expr*))
+	(vector (%compute)
+	     
+	     ;; (/ (+
+	     ;;     ;; share of fixed vertices 0 -> 1
+	     ;;     (/ (count-if-not #'null (state-fixed-vertices s))
+	     ;;        (length (state-fixed-vertices s)))
+	     ;;     (/ 1
+	     ;;        (1+ dislikes)))
+	     ;;    2)
+	     ))))
 
 (defun make-initial-state ()
   (make-state
@@ -184,3 +201,10 @@
                  (push point result)))
              possible-locations)
     result))
+
+(defun get-solver-info ()
+  (plist-hash-table
+   (list "type" "mcts"
+	 "timeout" *timeout-in-seconds*
+	 "exploration" *exploration-coef*
+	 "reward-expr" (format nil "~A" *reward-expr*))))

@@ -8,7 +8,9 @@
   (:import-from :icfpc2021/polygon)
   (:import-from :icfpc2021/svg-drawer)
   (:import-from :icfpc2021/http)
-  (:import-from :cl-ppcre))
+  (:import-from :cl-ppcre)
+  (:import-from :alexandria
+		#:plist-hash-table))
 
 (in-package :icfpc2021/solver)
 
@@ -164,7 +166,7 @@
               (icfpc2021/svg-drawer:problem->svg
                (solution->parsed-problem problem new-solution)
                (format nil "~A_~5,'0D.svg" svg-prefix iter)))
-            (funcall hook problem new-solution)
+            (when hook (funcall hook problem new-solution))
             (if (or (< (solution-dist solution new-solution)
                        0.001)
                     (and max-iters
@@ -187,18 +189,24 @@
                      phase-spec)))
     solution))
 
+(defvar *phases-spec*
+  (list (list :edge-force-coef 0.05
+              :hole-force-coef 0.2
+              :to-inner-force 0.5)
+        (list :edge-force-coef 0.2
+              :hole-force-coef 0
+              :to-inner-force 0.5)))
+
+(defvar *max-iters* nil)
+
 (defun solve (problem &key max-iters svg-prefix (svg-freq 100) hook)
+  (setf *max-iters* max-iters)
   (solve-phases problem
                 :max-iters max-iters
                 :svg-prefix svg-prefix
                 :svg-freq svg-freq
                 :hook hook
-                :phases (list (list :edge-force-coef 0.05
-                                    :hole-force-coef 0.2
-                                    :to-inner-force 0.5)
-                              (list :edge-force-coef 0.2
-                                    :hole-force-coef 0
-                                    :to-inner-force 0.5))))
+                :phases *phases-spec*))
 
 (defun combinations (variants-list)
   (if (cdr variants-list)
@@ -301,3 +309,10 @@
                 (format t "Solution found for ~A: ~A~%" (file-problem-id file)
                         dislikes)
                 (icfpc2021/http:post-solution (file-problem-id file) solution)))))
+
+(defun get-solver-info ()
+  (plist-hash-table
+   (list "type" "spring"
+	 "max-iters" *max-iters*
+	 "phases-spec" (format nil "~A" *phases-spec*))))
+
