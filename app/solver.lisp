@@ -103,14 +103,17 @@
      (mapc-poly-edges
       (problem-hole problem)
       (lambda (hole-p1 hole-p2)
-        (when (lines-intersect? (make-segment :a p1 :b p2)
-                                (make-segment :a hole-p1 :b hole-p2))
-          (let ((dir (make-vec
-                      :x (- (p-y hole-p1) (p-y hole-p2))
-                      :y (- (p-x hole-p2) (p-x hole-p1)))))
-            ;; (format t "Inner force~%")
-            (add-delta forces i1 (delta-along-vec to-inner-force dir))
-            (add-delta forces i2 (delta-along-vec to-inner-force dir))))))))
+        (multiple-value-bind (intersect? non-strict?)
+            (lines-intersect? (make-segment :a p1 :b p2)
+                              (make-segment :a hole-p1 :b hole-p2))
+          (when (and (not non-strict?)
+                     intersect?)
+            (let ((dir (make-vec
+                        :x (- (p-y hole-p1) (p-y hole-p2))
+                        :y (- (p-x hole-p2) (p-x hole-p1)))))
+              ;; (format t "Inner force~%")
+              (add-delta forces i1 (delta-along-vec to-inner-force dir))
+              (add-delta forces i2 (delta-along-vec to-inner-force dir)))))))))
   ;; Apply forces
   (let ((new-solution (make-array (length solution))))
     (loop :for i :below (length solution)

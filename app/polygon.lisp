@@ -225,12 +225,35 @@
   (some (lambda (holy-line)
           (multiple-value-bind (intersect? non-strict?)
               (lines-intersect? line holy-line)
-            ;; (if non-strict?
-            ;;     (check-mid-point line raster)
-            ;;     intersect?)
-            (and (not non-strict?)
-                 intersect?)))
+            (if non-strict?
+                (null (check-line line raster))
+                intersect?)
+            ;; (and (not non-strict?)
+            ;;      intersect?)
+            ))
         (search line poly-tree)))
+
+(defun check-line (line raster)
+  (ematch line
+    ((segment :a (point (p-x x1) (p-y y1))
+              :b (point (p-x x2) (p-y y2)))
+     (if (= x1 x2)
+         (loop :for y :from (min y1 y2) :to (max y1 y2)
+            :always (= 1 (aref raster x1 y)))
+         (let ((dx (1+ (abs (- x2 x1))))
+               (dy (1+ (abs (- y2 y1)))))
+           (loop :with sx := (signum (- x2 x1))
+              :with sy := (signum (- y2 y1))
+              :with y := y1
+              :with error := 0
+              :for x := x1 :then (+ x sx)
+              :while (/= x x2)
+              :always (= 1 (aref raster x y))
+              :do (incf error dy)
+              :when (>= error dx)
+              :do (progn
+                    (incf y sy)
+                    (decf error dx))))))))
 
 (defun check-mid-point (line raster)
   (ematch line
