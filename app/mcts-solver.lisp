@@ -164,8 +164,8 @@
 (defmethod possible-actions (s _)
   (declare (ignore _))
   (if (state-initial? s)
-      ;; (vertice-for-holes)
-      (select-initial-vertices)
+      (vertice-for-holes)
+      ;; (select-initial-vertices)
       (with-slots (fixed-vertices frontier) s
         ;; (when frontier
         ;;   (let* ((free-vertex (car frontier))
