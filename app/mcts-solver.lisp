@@ -12,7 +12,9 @@
   (:import-from #:icfpc2021/svg-drawer)
   (:import-from :metabang-bind
                 #:bind)
-  (:export #:mcts-solve))
+  (:import-from #:icfpc2021/a-star)
+  (:export #:mcts-solve
+           #:a-star-solve))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -106,11 +108,14 @@
 	 (/ 1 (1+ dislikes)))
 	2)))
 
+(defun state-dislikes (s)
+  (reduce #'+ (state-nearest-figure-vertice-dist s)
+          :initial-value 0))
+
 (defmethod estimate-state-rewards (s _)
   (declare (ignore _))
   ;; added dist square to the neares
-  (let ((dislikes (reduce #'+ (state-nearest-figure-vertice-dist s)
-                          :initial-value 0)))
+  (let ((dislikes (state-dislikes s)))
     (macrolet ((%compute () `,*reward-expr*))
 	(vector (%compute)
 	     
@@ -295,3 +300,49 @@
 		:for end := (nth (second edge) vertices)
 		:when (and start end)
 		  :do (icfpc2021/svg-drawer::draw-line-segment scene start end :stroke "red")))))))
+
+;; A-star stuff
+
+(defstruct a-star-state
+  orig-state
+  dislikes)
+
+(defmethod icfpc2021/a-star:next-states ((state a-star-state))
+  (labels ((%next (action)
+             (let ((next-orig-state (next-state
+                                     (clone-state
+                                      (a-star-state-orig-state state))
+                                     action)))
+               (make-a-star-state
+                :orig-state next-orig-state
+                :dislikes (state-dislikes next-orig-state)))))
+    (let ((actions (possible-actions (a-star-state-orig-state state) 0)))
+      (mapcar #'%next actions))))
+
+(defmethod icfpc2021/a-star:final-state? ((state a-star-state))
+  (zerop (count-if #'null (state-fixed-vertices (a-star-state-orig-state state)))))
+
+(defmethod icfpc2021/a-star:state-estimate ((state a-star-state))
+  (a-star-state-dislikes state))
+
+(defun a-star-solve (problem)
+  (let* ((max-coord (loop :for p :across (problem-hole problem)
+                          :maximizing (max (p-x p) (p-y p))))
+         (max-r (ceiling (* (sqrt 2) max-coord)))
+         (*problem* problem)
+         (*ring-table* (make-ring-hash-table max-r))
+         (*holy-raster* (rasterize-polygon max-r max-r (problem-hole problem)))
+         (*distance-matrix* (make-shortest-paths-matrix problem))
+	     (init-state (make-a-star-state
+                      :orig-state (make-initial-state)
+                      :dislikes most-positive-fixnum))
+         (solved-state (icfpc2021/a-star:a-star
+                        init-state)))
+    (when solved-state
+      (state-fixed-vertices (a-star-state-orig-state solved-state)))))
+
+(defun a-star-solver-info ()
+  (plist-hash-table
+   (list
+    "type" "a-star"
+	"estimate" "dislikes")))
