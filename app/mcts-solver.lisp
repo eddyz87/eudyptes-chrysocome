@@ -164,8 +164,7 @@
 (defmethod possible-actions (s _)
   (declare (ignore _))
   (if (state-initial? s)
-      ;; (loop :for hole-point :across (problem-hole *problem*)
-      ;;       :collect (cons 0 hole-point))
+      ;; (vertice-for-holes)
       (select-initial-vertices)
       (with-slots (fixed-vertices frontier) s
         (loop
@@ -178,17 +177,27 @@
          1000000)
       (problem-epsilon *problem*)))
 
+(defun vertice-for-holes ()
+  (loop :for hole-point :across (problem-hole *problem*)
+     :collect (cons 0 hole-point)))
+
+(defun hole-for-vertices ()
+  (loop :with hole-point := (aref (problem-hole *problem*) 0)
+     :for vertex :across (problem-init-pos *problem*)
+     :collect (cons vertex hole-point)))
+
 (defun select-initial-vertices ()
-  (loop :with hole := (problem-hole *problem*)
-     :for i :from 0 :below (length hole)
-     :for hole-i := (aref hole i)
-     :for hole-j := (aref hole (mod (1+ i) (length hole)))
-     :for dist := (dist-square hole-i hole-j)
-     :append (loop :with edges := (problem-edges *problem*)
-                :for edge-i :from 0 :below (length edges)
-                :append (loop :for edge :in (aref edges edge-i)
-                           :when (same-distance? dist (edge-len-square edge))
-                           :collect (cons edge-i hole-i)))))
+  (or (loop :with hole := (problem-hole *problem*)
+         :for i :from 0 :below (length hole)
+         :for hole-i := (aref hole i)
+         :for hole-j := (aref hole (mod (1+ i) (length hole)))
+         :for dist := (dist-square hole-i hole-j)
+         :append (loop :with edges := (problem-edges *problem*)
+                    :for edge-i :from 0 :below (length edges)
+                    :append (loop :for edge :in (aref edges edge-i)
+                               :when (same-distance? dist (edge-len-square edge))
+                               :collect (cons edge-i hole-i))))
+      (hole-for-vertices)))
 
 ;; TODO: remove points that add intersections with hole edges !!!!
 (defun possible-positions (fixed-vertices free-vertex)
