@@ -34,6 +34,7 @@
 (defparameter *spring-solver-func*
   (lambda (problem)
     (icfpc2021/solver::solve problem :max-iters 100)))
+(defvar *a-star/mcts-solver-func* #'icfpc2021/mcts-solver:a-star/mcts-solve)
 
 (defun main (&key problems-dir solutions-dir (solver :all))
   (let ((*problems-dir* (or problems-dir (dir-pathname "../problems/")))
@@ -44,7 +45,8 @@
                                *a-star-solver-func*))
 		           (:mcts (list *mcts-solver-func*))
 		           (:spring (list *spring-solver-func*))
-                   (:a-star (list *a-star-solver-func*)))))
+                           (:a-star (list *a-star-solver-func*))
+                           (:a-star/mcts (list *a-star/mcts-solver-func*)))))
     (format t "Solving problems to find the best solution...~%~%")
     (loop :for problem-file :in (uiop:directory-files *problems-dir*)
           :do (process-problem problem-file solvers))))
@@ -56,6 +58,8 @@
          (icfpc2021/solver::get-solver-info))
         ((eq solver *a-star-solver-func*)
          (icfpc2021/mcts-solver::a-star-solver-info))
+        ((eq solver *a-star/mcts-solver-func*)
+         (icfpc2021/mcts-solver::a-star/mcts-solver-info))
         (t (error "Unknown solver ~A~%" solver))))
 
 (defun process-problem (problem-file solvers)

@@ -16,7 +16,8 @@
   (:import-from #:icfpc2021/a-star)
   (:export #:mcts-solve
            #:a-star-solve
-           #:a-star/mcts-solve))
+           #:a-star/mcts-solve
+           #:a-star/mcts-solver-info))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -459,53 +460,73 @@
 
 (defparameter *a-star/mcts-refinement-group-size* 3)
 
+(defun a-star/mcts-solver-info ()
+  (plist-hash-table
+   (list
+    "type" "a-star/mcts"
+    "a-star-estimate" "dislikes"
+    "mcts-group-size" *a-star/mcts-refinement-group-size*)))
+
 (defun compute-solution-cost (fixed-vertices hole)
   (loop :for c :across (compute-hole-distances fixed-vertices hole)
         :summing c))
 
 (defun a-star/mcts-solve (problem)
-  (let ((figure-vertices-num (length (problem-init-pos problem))))
+  (let ((figure-vertices-num (length (problem-init-pos problem)))
+        (start-time (get-internal-run-time)))
     (with-problem-context problem
       (labels
           ((%refine-once (already-refined fixed-vertices)
-             (format t "Trying to refine solution from ~A~%"
-                     (compute-solution-cost fixed-vertices (problem-hole problem)))
-             (let*
-                 ((vertice-costs (compute-figure-vertex-costs fixed-vertices (problem-hole problem)))
-                  (first-refinement-vertice (or (maximal-element-index
-                                                 vertice-costs
-                                                 :filter (lambda (elt idx)
-                                                           (and (not (gethash idx already-refined))
-                                                                (/= 0 elt))))
-                                                (progn
-                                                  (format t "No more refinement points~%")
-                                                  (return-from %refine-once fixed-vertices))))
-                  (refinement-vertices (collect-vertices-from-point first-refinement-vertice
-                                                                    (problem-edges problem)
-                                                                    *a-star/mcts-refinement-group-size*))
-                  (mcts-fixed-vertices (loop :with new-vertices := (subseq fixed-vertices 0)
-                                             :for index :in refinement-vertices
-                                             :do (setf (aref new-vertices index) nil)
-                                             :finally (return new-vertices)))
-                  (_ (format t "going to refine vertices: ~A~%" refinement-vertices))
-                  (_ (format t "frontier: ~A~%" (collect-frontier mcts-fixed-vertices (problem-edges problem))))
-                  (mcts-state (make-state
-                               :fixed-vertices mcts-fixed-vertices
-                               :frontier (collect-frontier mcts-fixed-vertices (problem-edges problem))
-                               :nearest-figure-vertice-dist (compute-hole-distances mcts-fixed-vertices
-                                                                                    (problem-hole problem))))
-                  (mcts-solution (mcts-solve-aux
-                                  :figure-vertices-num (length refinement-vertices)
-                                  :root-state mcts-state
-                                  :early-exit-treshold 100)))
-               (declare (ignore _))
+             (let* ((old-cost (compute-solution-cost fixed-vertices (problem-hole problem)))
+                    (_1 (format t "Trying to refine solution from ~A~%" old-cost))
+                    (vertice-costs (compute-figure-vertex-costs fixed-vertices (problem-hole problem)))
+                    (first-refinement-vertice (or (maximal-element-index
+                                                   vertice-costs
+                                                   :filter (lambda (elt idx)
+                                                             (and (not (gethash idx already-refined))
+                                                                  (/= 0 elt))))
+                                                  (progn
+                                                    (format t "No more refinement points~%")
+                                                    (return-from %refine-once fixed-vertices))))
+                    (refinement-vertices (collect-vertices-from-point first-refinement-vertice
+                                                                      (problem-edges problem)
+                                                                      *a-star/mcts-refinement-group-size*))
+                    (mcts-fixed-vertices (loop :with new-vertices := (subseq fixed-vertices 0)
+                                               :for index :in refinement-vertices
+                                               :do (setf (aref new-vertices index) nil)
+                                               :finally (return new-vertices)))
+                    (_2 (format t "going to refine vertices: ~A~%" refinement-vertices))
+                    (_3 (format t "frontier: ~A~%" (collect-frontier mcts-fixed-vertices
+                                                                     (problem-edges problem))))
+                    (mcts-state
+                      (make-state
+                       :fixed-vertices mcts-fixed-vertices
+                       :frontier (collect-frontier mcts-fixed-vertices (problem-edges problem))
+                       :nearest-figure-vertice-dist (compute-hole-distances mcts-fixed-vertices
+                                                                            (problem-hole problem))))
+                    (mcts-solution
+                      (let ((*timeout-in-seconds* (max 0
+                                                       (- *timeout-in-seconds*
+                                                          (floor
+                                                           (/ (- (get-internal-run-time)
+                                                                 start-time)
+                                                              internal-time-units-per-second))))))
+                        (format t "Using MCTS timeout ~A~%" *timeout-in-seconds*)
+                        (mcts-solve-aux
+                         :figure-vertices-num (length refinement-vertices)
+                         :root-state mcts-state
+                         :early-exit-treshold 100))))
+               (declare (ignore _1 _2 _3))
                (setf (gethash first-refinement-vertice already-refined) t)
                (if mcts-solution
-                   (progn
-                     (format t "MCTS refined to ~A / ~A points set~%"
-                             (compute-solution-cost mcts-solution (problem-hole problem))
-                             (count-if-not #'null mcts-solution))
-                     mcts-solution)
+                   (let ((new-cost (compute-solution-cost mcts-solution (problem-hole problem))))
+                     (if (< new-cost old-cost)
+                         (progn
+                           (format t "MCTS refined to ~A~%" new-cost)
+                           mcts-solution)
+                         (progn
+                           (format t "Discarding MCTS solution with worse score ~A~%" new-cost)
+                           fixed-vertices)))
                    (progn
                      (format t "MCTS failed to refine~%")
                      fixed-vertices)))))
