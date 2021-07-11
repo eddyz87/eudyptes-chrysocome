@@ -1,0 +1,1 @@
+{"vertices":[[0,71],[2,0],[2,34],[32,17],[33,52]],"dislikes":2362,"solver-info":{"type":"mcts","timeout":20,"exploration":0.7071067690849304,"reward-expr":"NIL"}}

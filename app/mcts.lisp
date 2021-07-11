@@ -12,7 +12,8 @@
            #:estimate-state-rewards
            #:print-decision-tree
            #:count-nodes
-           #:mapc-children-actions)
+           #:mapc-children-actions
+           #:print-mcts-tree-stats)
   (:import-from :cl-ppcre)
   (:import-from #:icfpc2021/utils
    :dir-pathname)
@@ -284,3 +285,70 @@
                    :do (funcall fn new-actions)
                    :do (%traverse new-actions child-node))))
     (%traverse nil root)))
+
+(defun make-histogram (values baskets &key (key #'identity) (round #'identity))
+  (loop
+    :for item :in values
+    :for value := (funcall key item)
+    :collect value :into true-values
+    :minimizing value :into min-value
+    :maximizing value :into max-value
+    :finally
+       (return
+         (loop
+           :with step := (/ (- max-value min-value) baskets)
+           :with histogram := (make-array
+                               baskets
+                               :initial-contents (loop
+                                                   :for i :below baskets
+                                                   :collect (cons 0
+                                                                  (funcall round (+ min-value (* i step))))))
+           :for value :in true-values
+           :do (incf (car (aref histogram (min (1- baskets)
+                                               (if (= step 0)
+                                                   0
+                                                   (floor (/ (- value min-value) step)))))))
+           :finally
+              (progn
+                (let ((values-num (length values)))
+                  (loop :for i :below baskets
+                        :do (setf (car (aref histogram i))
+                                  (/ (car (aref histogram i))
+                                     values-num))))
+                (return histogram))))))
+
+(defun print-mcts-tree-stats (root)
+  (let ((level->nodes (make-hash-table)))
+    (labels ((%traverse (level node)
+               (loop :for (child-node . action) :in (children node)
+                     :do (push node
+                               (gethash level level->nodes))
+                     :do (%traverse (1+ level) child-node))))
+      (%traverse 0 root))
+    (loop
+      :for level :from 0
+      :for nodes := (gethash level level->nodes)
+      :while nodes
+      :do
+         (let* ((baskets 10)
+                (name/key/round
+                  (list (list "Branches" (lambda (n) (length (children n))) #'round)
+                        (list "Visits" #'visit-count #'round)
+                        (list "Rewards" (lambda (n) (aref (simulation-rewards n) 0)) #'identity))))
+           (format t "------~%")
+           (format t "Level ~A, nodes #~A~%" level (length nodes))
+           (format t "------~%")
+           (loop
+             :for (name key round) :in name/key/round
+             :for histogram := (make-histogram nodes baskets :key key :round round)
+             :do (progn
+                   (format t "~10A: " name)
+                   (loop :for (share . left-limit) :across histogram
+                         :do (if (integerp left-limit)
+                                 (format t "~10d: " left-limit)
+                                 (format t "~10,5g: " left-limit))
+                         :do (if (< share 0.01)
+                                 (format t "____")
+                                 (format t "~,2f" share))
+                         :do (format t "  "))
+                   (format t "~%")))))))
