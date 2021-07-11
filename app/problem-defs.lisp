@@ -14,9 +14,9 @@
            #:make-hole
            #:hole-vertices
 	   #:make-saved-solution
-	   #:save-solution-vertices
-	   #:save-solution-dislikes
-	   #:save-solution-solver-info
+	   #:saved-solution-vertices
+	   #:saved-solution-dislikes
+	   #:saved-solution-solver-info
 	   #:saved-solution->ht))
 
 (in-package :icfpc2021/problem-defs)

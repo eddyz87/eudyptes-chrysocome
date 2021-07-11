@@ -36,7 +36,7 @@
 (defvar *holy-raster*)
 (defvar *distance-matrix*)
 
-(defvar *timeout-in-seconds* 15)
+(defvar *timeout-in-seconds* 60)
 (defvar *exploration-coef* (sqrt 0.5))
 
 (defun mcts-solve (problem)
