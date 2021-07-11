@@ -34,7 +34,9 @@
 (defparameter *spring-solver-func*
   (lambda (problem)
     (icfpc2021/solver::solve problem :max-iters 100)))
-(defvar *a-star/mcts-solver-func* #'icfpc2021/mcts-solver:a-star/mcts-solve)
+(defparameter *a-star/mcts-solver-func*
+  (lambda (problem)
+    (icfpc2021/mcts-solver:a-star/mcts-solve problem)))
 
 (defun main (&key problems-dir solutions-dir (solver :all))
   (let ((*problems-dir* (or problems-dir (dir-pathname "../problems/")))

@@ -540,7 +540,8 @@
                      fixed-vertices)))))
         (loop
           :with already-refined := (make-hash-table)
-          :with fixed-vertices := (or (a-star-solve-aux)
+          :with fixed-vertices := (or (let ((*timeout-in-seconds* (/ *timeout-in-seconds* 2)))
+                                        (a-star-solve-aux))
                                       (return-from a-star/mcts-solve nil))
           :for i :below figure-vertices-num ;; TODO ???
           :do (setf fixed-vertices (%refine-once already-refined fixed-vertices))
