@@ -13,7 +13,11 @@
            #:print-decision-tree
            #:count-nodes
            #:mapc-children-actions)
-  (:import-from :cl-ppcre))
+  (:import-from :cl-ppcre)
+  (:import-from #:icfpc2021/utils
+   :dir-pathname)
+  (:import-from #:metabang-bind
+   :bind))
 
 (in-package :icfpc2021/mcts)
 
@@ -75,6 +79,9 @@
 
 (defmethod show-action ((a t))
   (format nil "~A" a))
+
+(defmethod show-state ((s t))
+  (format nil "~A" s))
 
 (defun get-best-move (root)
   (let* ((*exploration-coefficient* 0))
@@ -211,31 +218,46 @@
       (setf (gethash node *node-dot-ids*)
             (incf *node-dot-ids-counter*))))
 
+(defvar *state->svg-func* nil)
+
 (defun node-to-dot (stream node state best?)
   (let ((id (node-dot-id node))
         (best-child (when (children node)
                       (car (select-best-child node)))))
-    (format stream "  ~A [label=\"~A\", shape=box ~A];~%"
-            id
-            (node-dot-label node state)
-            (if best? ", fillcolor=lightgray, style=filled" ""))
+
+    ;; draw state to svg
+    (if *state->svg-func*
+	(let ((svg-filename (ensure-directories-exist
+			     (format nil "~A/mcts-state-~A.svg"
+				     (dir-pathname "../svg")
+				     id))))
+	  (funcall *state->svg-func* state svg-filename)
+	  (format stream "  ~A [label=\"~A\", shape=box ~A, image=\"~A\", imagepos=tl, labelloc=b, height=2.5];~%"
+		  id
+		  (node-dot-label node state)
+		  (if best? ", fillcolor=lightgray, style=filled" "")
+		  svg-filename))
+	(format stream "  ~A [label=\"~A\", shape=box ~A];~%"
+		id
+		(node-dot-label node state)
+		(if best? ", fillcolor=lightgray, style=filled" "")))
     (loop for (child . action) in (children node) do
-         (format stream "  ~A -> ~A [label = \"~A\"];~%"
-                 id
-                 (node-dot-id child)
-                 (escape-for-dot
-                  (show-action action)))
-         (node-to-dot stream
-                      child
-                      (next-state (clone-state state) action)
-                      (eq child best-child)))))
+      (format stream "  ~A -> ~A [label = \"~A\"];~%"
+              id
+              (node-dot-id child)
+              (escape-for-dot
+               (show-action action)))
+      (node-to-dot stream
+                   child
+                   (next-state (clone-state state) action)
+                   (eq child best-child)))))
 
 (defun node-dot-label (node state)
   (escape-for-dot
    (with-output-to-string (stream)
      (format stream "N: ~A Q: ~A P: ~A~A~%"
              (visit-count node)
-             (simulation-rewards node)
+             (map 'list #'float (simulation-rewards node))
              (player node)
              (if (unexplored-actions node)
                  (format nil " A: ~A~%" (length (unexplored-actions node)))
