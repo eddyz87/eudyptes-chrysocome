@@ -1,0 +1,1 @@
+{"vertices":[[35,48],[49,31],[52,7],[50,29],[60,51],[37,25],[32,48],[36,49],[39,69],[42,72],[5,46],[58,58],[52,51],[28,41]],"dislikes":3252,"solver-info":{"type":"spring","max-iters":100,"phases-spec":"((EDGE-FORCE-COEF 0.05 HOLE-FORCE-COEF 0.2 TO-INNER-FORCE 0.5)\n (EDGE-FORCE-COEF 0.2 HOLE-FORCE-COEF 0 TO-INNER-FORCE 0.5))"}}

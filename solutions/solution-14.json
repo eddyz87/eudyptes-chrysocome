@@ -1,0 +1,1 @@
+{"vertices":[[0,0],[10,0],[10,10]],"dislikes":116,"solver-info":{"type":"mcts","timeout":60,"exploration":0.7071067690849304,"reward-expr":"(/\n (+\n  (/ (COUNT-IF-NOT #'NULL (STATE-FIXED-VERTICES S))\n     (LENGTH (STATE-FIXED-VERTICES S)))\n  (/ 1 (1+ DISLIKES)))\n 2)"}}
