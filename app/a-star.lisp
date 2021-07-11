@@ -23,21 +23,29 @@
                                (predicate #'<)
                                hash-state?
                                (state-hash-test #'eql)
-                               timeout-in-seconds)
+                               timeout-in-seconds
+                               exhaustive?)
   (let ((queue (pileup:make-heap predicate :key #'state-estimate))
         (visited (when hash-state?
                    (make-hash-table :test state-hash-test)))
         (stop-time (when timeout-in-seconds
                      (+ (get-internal-run-time)
                         (* timeout-in-seconds
-                           internal-time-units-per-second)))))
+                           internal-time-units-per-second))))
+        (best-solution nil)
+        (best-estimate nil))
     (pileup:heap-insert initial-state queue)
     (loop :for state := (pileup:heap-pop queue)
           :while (and state
                       (or (null stop-time)
                           (< (get-internal-run-time) stop-time)))
           :do (if (final-state? state)
-                  (return-from a-star state)
+                  (if exhaustive?
+                      (when (or (null best-solution)
+                                (funcall predicate (state-estimate state) best-estimate))
+                        (setf best-estimate (state-estimate state)
+                              best-solution state))
+                      (return-from a-star state))
                   (loop :for next-state :in (next-states state)
                         :do (unless (and hash-state?
                                          (gethash (state-hash-object next-state)
@@ -47,7 +55,8 @@
                                                visited)
                                       t))
                               (pileup:heap-insert next-state queue)))))
-    nil))
+    (when exhaustive?
+      best-solution)))
 
 
 ;; Test

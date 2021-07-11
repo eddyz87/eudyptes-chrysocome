@@ -285,17 +285,22 @@
                                                                                      :b point)
                                                                        *holy-tree*
                                                                        *holy-raster*))
-                                     :collect point)))
-    (loop
-      :with L-index := free-vertex
-      :for L :in possible-locations
-      :when (loop
-              :for F-index :below (length fixed-vertices)
-              :for F := (aref fixed-vertices F-index)
-              :always (or (null F)
-                          (<= (dist-square L F)
-                              (square (shortest-path *distance-matrix* L-index F-index)))))
-        :collect L)))
+                                     :collect point))
+         (result (loop
+                   :with L-index := free-vertex
+                   :for L :in possible-locations
+                   :when (loop
+                           :for F-index :below (length fixed-vertices)
+                           :for F := (aref fixed-vertices F-index)
+                           :always (or (null F)
+                                       (<= (dist-square L F)
+                                           (round (square (shortest-path *distance-matrix* L-index F-index))))))
+                     :collect L)))
+    ;; (format t "Fixed circles: ~A~%" fixed-circles)
+    ;; (format t "Fixed circles int: ~A~%" fixed-circles-intersections)
+    ;; (format t "Lines: ~A~%" possible-locations)
+    ;; (format t "After shortest: ~A~%" result)
+    result))
 
 (defun square (x)
   (* x x))
@@ -370,6 +375,8 @@
 (defmethod icfpc2021/a-star:state-estimate ((state a-star-state))
   (a-star-state-dislikes state))
 
+(defparameter *a-star-exhaustive?* nil)
+
 (defun a-star-solve (problem)
   (with-problem-context problem
     (a-star-solve-aux)))
@@ -380,7 +387,8 @@
                       :dislikes most-positive-fixnum))
          (solved-state (icfpc2021/a-star:a-star
                         init-state
-                        :timeout-in-seconds *timeout-in-seconds*)))
+                        :timeout-in-seconds *timeout-in-seconds*
+                        :exhaustive? *a-star-exhaustive?*)))
     (when solved-state
       (state-fixed-vertices (a-star-state-orig-state solved-state)))))
 
