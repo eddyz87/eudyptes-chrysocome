@@ -1,1 +1,1 @@
-{"vertices":[[7,44],[23,38],[26,42],[4,23],[15,16],[19,0],[27,60],[12,2],[10,7],[22,0],[18,16],[8,24],[29,60]],"dislikes":237,"solver-info":{"type":"a-star","estimate":"dislikes"}}
+{"vertices":[[7,44],[23,38],[26,42],[4,23],[15,16],[19,0],[27,60],[12,2],[10,7],[22,0],[18,16],[8,24],[30,61]],"dislikes":235,"solver-info":{"type":"a-star/mcts","a-star-estimate":"dislikes","mcts-group-size":3}}
