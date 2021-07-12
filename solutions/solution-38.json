@@ -1,1 +1,1 @@
-{"vertices":[[47,64],[5,21],[39,18],[38,51],[33,29],[33,15],[3,8],[24,13],[31,31],[65,52],[42,54]],"dislikes":338,"solver-info":{"TYPE":"a-star-with-her","ESTIMATE":"dislikes","EXHAUSTIVE":true,"HER":null}}
+{"vertices":[[47,64],[18,13],[41,16],[52,49],[47,27],[47,13],[5,13],[46,9],[39,27],[68,54],[45,56]],"dislikes":244,"solver-info":{"TYPE":"a-star-annealer","TEMPERATURE-FUNCTION":"sigmoid (7x - 5)","MAX-ITER-TIME":"1/20 * budget","WORSEN-PROBABILITY":"(< (random 100) (* 25 (- 1 time-budget-elapsed)))"}}
