@@ -17,6 +17,7 @@
   (:import-from #:alexandria
                 #:plist-hash-table
                 #:hash-table-plist)
+  (:import-from #:cl-threadpool)
   (:export #:main
            #:post-saved-solutions))
 
@@ -38,14 +39,13 @@
   (lambda (problem)
     (icfpc2021/mcts-solver:a-star/mcts-solve problem :debug-stream nil)))
 
-(defun main (&key problems-dir solutions-dir (solver :all))
-  (let ((icfpc2021/mcts-solver:*a-star-exhaustive?* t)
-	(*problems-dir* (or problems-dir (dir-pathname "../problems/")))
-	(*solutions-dir* (or solutions-dir (dir-pathname "../solutions/")))
+(defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6))
+  (let ((problems-dir (or problems-dir (dir-pathname "../problems/")))
 	(solvers (ecase solver
-		   (:all (list ;; *mcts-solver-func*
-			  ;; *spring-solver-func*
-			  *a-star-solver-func*
+		   (:all (list
+			  *mcts-solver-func*
+			  *spring-solver-func*
+			  ;; *a-star-solver-func*
 			  *a-star/mcts-solver-func*
 			  ))
 		   (:mcts (list *mcts-solver-func*))
@@ -53,8 +53,23 @@
                    (:a-star (list *a-star-solver-func*))
                    (:a-star/mcts (list *a-star/mcts-solver-func*)))))
     (format t "Solving problems to find the best solution...~%~%")
-    (loop :for problem-file :in (uiop:directory-files *problems-dir*)
-          :do (process-problem problem-file solvers))))
+    (let ((threadpool (cl-threadpool:make-threadpool n-threads))
+	  (jobs (mapcar
+		 (lambda (problem-file)
+		   (lambda ()
+		     (let ((icfpc2021/mcts-solver:*a-star-exhaustive?* t)
+			   (*problems-dir* problems-dir)
+			   (*solutions-dir* (or solutions-dir
+						(dir-pathname "../solutions/")))
+			   (icfpc2021/mcts-solver::*timeout-in-seconds* (+ 60 (random 10))))
+		       (process-problem problem-file solvers))))
+		 (uiop:directory-files problems-dir))))
+      (cl-threadpool:run-jobs threadpool jobs)
+      ;; (loop :while (not (cl-threadpool:pool-stopped-p threadpool))
+      ;; 	    :do (mapc #'cl-threadpool:job-result jobs)
+      ;; 		(sleep 5))
+      (cl-threadpool:stop threadpool)
+      (format t "Threadpool stopped!"))))
 
 (defun solver-info (solver)
   (cond ((eq solver *mcts-solver-func*)
@@ -70,32 +85,41 @@
 (defun process-problem (problem-file solvers)
   (let* ((problem-id (problem-id-from-filename problem-file))
 	 (solution-file (solution-file-name problem-id *solutions-dir*))
-	 (saved-solution (load-saved-solution solution-file)))
-    (when saved-solution
-      (format t "Loaded saved solution for problem ~A: dislikes = ~A solver-info = ~A~%"
-	      problem-id
-	      (saved-solution-dislikes saved-solution)
-	      (hash-table-plist (saved-solution-solver-info saved-solution))))
+	 (saved-solution (load-saved-solution solution-file))
+	 )
+    ;; (when saved-solution
+    ;;   (format t "Loaded saved solution for problem ~A: dislikes = ~A~%"
+    ;; 	      problem-id
+    ;; 	      (saved-solution-dislikes saved-solution)
+    ;; 	      ;; (hash-table-plist (saved-solution-solver-info saved-solution))
+    ;; 	      ))
+    (when (and saved-solution
+	       (= 0 (saved-solution-dislikes saved-solution)))
+      (format t "0 dislikes for problem ~A in saved solution! Nothing to do.~%" problem-id)
+      (return-from process-problem saved-solution))
     (loop :for solver :in solvers
-	  :do (format t "Solving ~A with solver: ~A ~%"
-		      problem-id
-		      (hash-table-plist (solver-info solver)))
-	      (multiple-value-bind (solution dislikes)
-		  (ignore-errors (solve-file solver problem-file))
-		(if solution
-		    (progn
-		      (format t "Solution computed for problem ~A: dislikes = ~A~%"
-			      problem-id dislikes)
-		      (when (or (null saved-solution)
-				(< dislikes (saved-solution-dislikes saved-solution)))
-			(save-json (saved-solution->ht
-				    (make-saved-solution
-				     :vertices solution
-				     :dislikes dislikes
-				     :solver-info (solver-info solver)))
-				   solution-file)))
-		    (format t "Solution not found~%"))
-		))))
+	  :do (let ((solver-type (gethash :type (solver-info solver))))
+		(format t "Solving ~A with solver: ~A ~%"
+			problem-id
+			solver-type)
+		(multiple-value-bind (solution dislikes)
+		    (ignore-errors (solve-file solver problem-file))
+		  (if solution
+		      (progn
+			(format t "Solution computed by solver ~A for problem ~A: dislikes = ~A (saved ~A)~%"
+				solver-type problem-id dislikes (saved-solution-dislikes saved-solution))
+			(when (or (null saved-solution)
+				  (< dislikes (saved-solution-dislikes saved-solution)))
+			  (save-json (saved-solution->ht
+				      (make-saved-solution
+				       :vertices solution
+				       :dislikes dislikes
+				       :solver-info (solver-info solver)))
+				     solution-file)))
+		      (format t "Solution not found for ~A by ~A~%"
+			      problem-id
+			      solver-type))
+		  )))))
 			; (icfpc2021/http:post-solution (problem-id-from-filename file) solution)
 
 (defun solve-file (solver json-file)

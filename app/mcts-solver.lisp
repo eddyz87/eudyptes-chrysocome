@@ -397,9 +397,9 @@
 (defun a-star-solver-info ()
   (plist-hash-table
    (list
-    "type" "a-star"
-    "estimate" "dislikes"
-    "exhaustive" *a-star-exhaustive?*)))
+    :type "a-star"
+    :estimate "dislikes"
+    :exhaustive *a-star-exhaustive?*)))
 
 (defun compute-figure-vertex-costs (figure-points hole-points)
   (loop
@@ -474,10 +474,10 @@
 (defun a-star/mcts-solver-info ()
   (plist-hash-table
    (list
-    "type" "a-star/mcts"
-    "a-star-estimate" "dislikes"
-    "mcts-group-size" *a-star/mcts-refinement-group-size*
-    "exhaustive" *a-star-exhaustive?*)))
+    :type "a-star/mcts"
+    :a-star-estimate "dislikes"
+    :mcts-group-size *a-star/mcts-refinement-group-size*
+    :exhaustive *a-star-exhaustive?*)))
 
 (defun compute-solution-cost (fixed-vertices hole)
   (loop :for c :across (compute-hole-distances fixed-vertices hole)
@@ -540,7 +540,7 @@
                            (format debug-stream "Discarding MCTS solution with worse score ~A~%" new-cost)
                            fixed-vertices)))
                    (progn
-                     (format t "MCTS failed to refine~%")
+                     (format debug-stream "MCTS failed to refine~%")
                      fixed-vertices)))))
         (loop
           :with already-refined := (make-hash-table)
