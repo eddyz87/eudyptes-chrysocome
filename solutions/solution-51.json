@@ -1,1 +1,1 @@
-{"vertices":[[9,36],[22,26],[22,21],[32,67],[26,56],[17,68],[66,38],[11,56],[8,60],[9,47],[24,47],[22,35],[65,39]],"dislikes":2187,"solver-info":{"TYPE":"a-star-annealer","TEMPERATURE-FUNCTION":"sigmoid (7x - 5)","MAX-ITER-TIME":"1/20 * budget","WORSEN-PROBABILITY":"(< (random 100) (* 25 (- 1 time-budget-elapsed)))"}}
+{"vertices":[[15,0],[22,15],[19,19],[23,35],[12,41],[0,50],[67,38],[12,56],[8,59],[6,72],[21,69],[33,67],[61,91]],"dislikes":0,"solver-info":{"TYPE":"a-star","ESTIMATE":"dislikes","EXHAUSTIVE":true,"HER":null}}
