@@ -47,20 +47,25 @@
 		;; 		  :when v :count 1)))
 		;; (when (< last-n-fixed n-fixed)
 		;;   (setf last-n-fixed n-fixed)
-		;;   (format t "f(state) = ~A; dislikes = ~A; n-fixed = ~A; n-free = ~A~%"
+		;;   (format t "f(state) = ~A; her(state) = ~A; dislikes = ~A; n-fixed = ~A; n-free = ~A; samples = ~A~%"
 		;; 	  (state-estimate state)
+		;; 	  (icfpc2021/mcts-solver::her state)
 		;; 	  (icfpc2021/mcts-solver::a-star-state-dislikes state)
 		;; 	  n-fixed
 		;; 	  (- (length (icfpc2021/mcts-solver::state-fixed-vertices
 		;; 		      (icfpc2021/mcts-solver::a-star-state-orig-state state)))
-		;; 	     n-fixed)))
+		;; 	     n-fixed)
+		;; 	  icfpc2021/mcts-solver::*sample-count*))
 		(if (final-state? state)
-		    (if exhaustive?
-			(when (or (null best-solution)
-				  (funcall predicate (state-estimate state) best-estimate))
-			  (setf best-estimate (state-estimate state)
-				best-solution state))
-			(return-from a-star state))
+		    (progn
+		      (when (or (null best-solution)
+				(funcall predicate
+					 (state-estimate state)
+					 best-estimate))
+			(setf best-estimate (state-estimate state)
+			      best-solution state))
+		      (when exhaustive?
+			(return-from a-star state)))
                     (loop :for next-state :in (next-states state)
 			  :do (unless (and hash-state?
 					   (gethash (state-hash-object next-state)
@@ -70,8 +75,7 @@
 						 visited)
 					t))
 				(pileup:heap-insert next-state queue))))))
-    (when exhaustive?
-      best-solution)))
+    best-solution))
 
 
 ;; Test

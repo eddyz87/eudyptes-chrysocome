@@ -49,10 +49,10 @@
 (defvar *distance-matrix*)
 (defvar *complete/total-estimates*)
 
-(defparameter *timeout-in-seconds* 60)
+(defparameter *timeout-in-seconds* 300)
 (defparameter *exploration-coef* (sqrt 0.5))
 
-(defparameter *a-star-exhaustive?* nil)
+(defparameter *a-star-exhaustive?* t)
 
 (defun exec-with-problem-context (problem fn)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
@@ -386,50 +386,51 @@
   (let* ((fixed-vertices (state-fixed-vertices
 			  (a-star-state-orig-state a-star-state)))
 	 (dislikes (a-star-state-dislikes a-star-state))
-	 ;; (limit (* (expt 10 5) (length fixed-vertices)))
 	 (n-fixed 0)
-	 (n-free 0))
+	 (n-free 0)
+	 (n (length fixed-vertices)))
     
     (loop :for v :across fixed-vertices :do
       (if v
 	  (incf n-fixed)
 	  (incf n-free)))
+
+    (when (/= 0 n-fixed)
+      (setf *min-dislikes* (min *min-dislikes* dislikes))
+      (setf *max-dislikes* (max *max-dislikes* dislikes))
+      (incf *sample-count*))
+    
+    
     (cond ((= 0 n-fixed) 0)
-	  ((= 0 n-free) 0)
+	  ((= 0 n-free) 1.0)
+	  ((= n n-fixed) 1.0)
+	  ;; encourage early exploration
+	  ;; by returning randomly high her-coef
+	  ;; while n-fixed is small
+	  ((< n-fixed (round (/ n 5)))
+	   (1+ (random (/ 10.0 n-fixed))))
 	  (t
-	   (setf *min-dislikes* (min *min-dislikes* dislikes))
-	   (setf *max-dislikes* (max *max-dislikes* dislikes))
-	   (let* ((dislikes-per-free (/ dislikes (* 30 n-free))))
-	     ;; (format t "d/free = ~A, md/all = ~A~%"
-	     ;; 	     (round (/ dislikes n-free))
-	     ;; 	     (round (/ *max-dislikes* (length fixed-vertices))))
-	     ;; (format t "fixed = ~A, free = ~A~%"
-	     ;; 	     n-fixed
-	     ;; 	     n-free)
-	     (incf *vertex/dislikes*
-		   (/ (- dislikes-per-free *vertex/dislikes*)
-		      (incf *sample-count*)))
-	     (round (* ;;(/ n-free (length fixed-vertices))
-		     dislikes-per-free n-fixed)))
-	   
-	  
-	   ;; (/ (* 10 n-fixed)
-	   ;;    (1+ (- *max-dislikes* *min-dislikes*))
-	   ;;    )
-	   ))
+	   ;; basic idea is her-coef changing depending on n-fixed like this
+	   ;; https://www.wolframalpha.com/input/?i=plot+%2825-x*0.99%29%2F%2825-x%29+from+1+to+24
+	   ;;
+	   ;; if a-star became too slow (too many samples visited)
+	   ;; then decrease the her-coef so that it approaches -> 1.0
+	   (let* ((her-coef (float (/ (- n (* n-fixed 0.965))
+				      (- n n-fixed))))
+		  (decrease-start-count (* 4 n (expt 10 5)))
+		  (intolerable-count (* 2 decrease-start-count)))
+	     (cond ((< *sample-count* decrease-start-count)
+		    her-coef)
+		   ((< *sample-count* intolerable-count)
+		    (1+ (* (- her-coef 1)
+			   (- 1 (/ (- *sample-count* decrease-start-count)
+				   (- intolerable-count decrease-start-count))))))
+		   (t 1.0)))))
     ))
 
 (defmethod icfpc2021/a-star:state-estimate ((state a-star-state))
-  ;; (format t "e = ~A + ~A = ~A~%"
-  ;; 	  (a-star-state-dislikes state)
-  ;; 	  (her state)
-  ;; 	  (+ (a-star-state-dislikes state)
-  ;; 	     (her state)))
-  (+ (a-star-state-dislikes state) ;; kind of remaining distance
-     (if *with-her* (her state) 0) ;; kind of walked distance
-     ))
-
-
+  (round (* (a-star-state-dislikes state)
+	    (if *with-her* (her state) 1.0))))
 
 (defun a-star-solve (problem)
   (with-problem-context problem
@@ -602,7 +603,7 @@
                      fixed-vertices)))))
         (loop
           :with already-refined := (make-hash-table)
-          :with fixed-vertices := (or (let ((*timeout-in-seconds* (/ *timeout-in-seconds* 2)))
+          :with fixed-vertices := (or (let ((*timeout-in-seconds* (* *timeout-in-seconds* 0.8)))
                                         (a-star-solve-aux))
                                       (return-from a-star/mcts-solve nil))
           :for i :below figure-vertices-num ;; TODO ???

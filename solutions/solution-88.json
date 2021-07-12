@@ -1,1 +1,1 @@
-{"vertices":[[49,85],[60,71],[65,71],[89,71],[94,59],[104,69],[45,53],[106,52],[105,57],[100,44],[92,56],[85,45],[46,27]],"dislikes":18510,"solver-info":{"type":"a-star/mcts","a-star-estimate":"dislikes","mcts-group-size":3}}
+{"vertices":[[29,75],[35,91],[40,90],[83,37],[76,48],[70,63],[103,80],[60,48],[62,53],[57,42],[73,39],[85,42],[18,6]],"dislikes":12620,"solver-info":{"TYPE":"a-star/mcts-with-her","A-STAR-ESTIMATE":"dislikes","MCTS-GROUP-SIZE":3,"EXHAUSTIVE":true,"HER":null}}

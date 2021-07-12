@@ -42,8 +42,15 @@
 
 (defparameter *a-star/mcts-with-her-solver-func*
   (lambda (problem)
-    (let ((icfpc2021/mcts-solver::*with-her* t))
+    (let ((icfpc2021/mcts-solver::*with-her* t)
+	  (icfpc2021/mcts-solver:*a-star-exhaustive?* t))
       (icfpc2021/mcts-solver:a-star/mcts-solve problem :debug-stream nil))))
+
+(defparameter *a-star-with-her-solver-func*
+  (lambda (problem)
+    (let ((icfpc2021/mcts-solver::*with-her* t)
+	  (icfpc2021/mcts-solver:*a-star-exhaustive?* t))
+      (icfpc2021/mcts-solver:a-star-solve problem))))
 
 
 (defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6) (timeout 60))
@@ -53,10 +60,10 @@
 			  
 			  ;; *spring-solver-func*
 			  ;; *a-star-solver-func*
-			  
+			  *a-star-with-her-solver-func*
 			  *a-star/mcts-with-her-solver-func*
-			  *a-star/mcts-solver-func*
-			  *mcts-solver-func*
+			  ;; *a-star/mcts-solver-func*
+			  ;; *mcts-solver-func*
 			  ))
 		   (:mcts (list *mcts-solver-func*))
 		   (:spring (list *spring-solver-func*))
@@ -67,7 +74,7 @@
 	  (jobs (mapcar
 		 (lambda (problem-file)
 		   (lambda ()
-		     (let ((icfpc2021/mcts-solver:*a-star-exhaustive?* t)
+		     (let (
 			   (*problems-dir* problems-dir)
 			   (*solutions-dir* (or solutions-dir
 						(dir-pathname "../solutions/")))
@@ -93,6 +100,11 @@
          (let ((ht (icfpc2021/mcts-solver::a-star/mcts-solver-info)))
 	   (setf (gethash :type ht)
 		 "a-star/mcts-with-her")
+	   ht))
+	((eq solver *a-star-with-her-solver-func*)
+         (let ((ht (icfpc2021/mcts-solver::a-star-solver-info)))
+	   (setf (gethash :type ht)
+		 "a-star-with-her")
 	   ht))
         (t (error "Unknown solver ~A~%" solver))))
 
