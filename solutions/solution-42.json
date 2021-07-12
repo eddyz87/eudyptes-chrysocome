@@ -1,1 +1,1 @@
-{"vertices":[[32,28],[52,13],[43,48],[30,19],[20,40],[10,39],[9,17]],"dislikes":2533,"solver-info":{"type":"spring","max-iters":100,"phases-spec":"((EDGE-FORCE-COEF 0.05 HOLE-FORCE-COEF 0.2 TO-INNER-FORCE 0.5)\n (EDGE-FORCE-COEF 0.2 HOLE-FORCE-COEF 0 TO-INNER-FORCE 0.5))"}}
+{"vertices":[[46,12],[53,36],[44,35],[31,44],[25,21],[4,37],[1,15]],"dislikes":2386,"solver-info":{"type":"a-star/mcts","a-star-estimate":"dislikes","mcts-group-size":3}}
