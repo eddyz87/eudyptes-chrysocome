@@ -322,7 +322,7 @@
 
 (defun get-solver-info ()
   (plist-hash-table
-   (list "type" "mcts"
+   (list :type "mcts"
 	 "timeout" *timeout-in-seconds*
 	 "exploration" *exploration-coef*
 	 "reward-expr" (format nil "~A" *reward-expr*))))
@@ -374,8 +374,60 @@
 (defmethod icfpc2021/a-star:final-state? ((state a-star-state))
   (zerop (count-if #'null (state-fixed-vertices (a-star-state-orig-state state)))))
 
+(defparameter *min-dislikes* (expt 2 31))
+(defparameter *max-dislikes* 0)
+
+(defparameter *vertex/dislikes* 0)
+(defparameter *sample-count* 0)
+
+(defparameter *with-her* nil)
+
+(defun her (a-star-state)
+  (let* ((fixed-vertices (state-fixed-vertices
+			  (a-star-state-orig-state a-star-state)))
+	 (dislikes (a-star-state-dislikes a-star-state))
+	 ;; (limit (* (expt 10 5) (length fixed-vertices)))
+	 (n-fixed 0)
+	 (n-free 0))
+    
+    (loop :for v :across fixed-vertices :do
+      (if v
+	  (incf n-fixed)
+	  (incf n-free)))
+    (cond ((= 0 n-fixed) 0)
+	  ((= 0 n-free) 0)
+	  (t
+	   (setf *min-dislikes* (min *min-dislikes* dislikes))
+	   (setf *max-dislikes* (max *max-dislikes* dislikes))
+	   (let* ((dislikes-per-free (/ dislikes (* 30 n-free))))
+	     ;; (format t "d/free = ~A, md/all = ~A~%"
+	     ;; 	     (round (/ dislikes n-free))
+	     ;; 	     (round (/ *max-dislikes* (length fixed-vertices))))
+	     ;; (format t "fixed = ~A, free = ~A~%"
+	     ;; 	     n-fixed
+	     ;; 	     n-free)
+	     (incf *vertex/dislikes*
+		   (/ (- dislikes-per-free *vertex/dislikes*)
+		      (incf *sample-count*)))
+	     (round (* ;;(/ n-free (length fixed-vertices))
+		     dislikes-per-free n-fixed)))
+	   
+	  
+	   ;; (/ (* 10 n-fixed)
+	   ;;    (1+ (- *max-dislikes* *min-dislikes*))
+	   ;;    )
+	   ))
+    ))
+
 (defmethod icfpc2021/a-star:state-estimate ((state a-star-state))
-  (a-star-state-dislikes state))
+  ;; (format t "e = ~A + ~A = ~A~%"
+  ;; 	  (a-star-state-dislikes state)
+  ;; 	  (her state)
+  ;; 	  (+ (a-star-state-dislikes state)
+  ;; 	     (her state)))
+  (+ (a-star-state-dislikes state) ;; kind of remaining distance
+     (if *with-her* (her state) 0) ;; kind of walked distance
+     ))
 
 
 
@@ -390,7 +442,11 @@
          (solved-state (icfpc2021/a-star:a-star
                         init-state
                         :timeout-in-seconds *timeout-in-seconds*
-                        :exhaustive? *a-star-exhaustive?*)))
+                        :exhaustive? *a-star-exhaustive?*))
+	 (*vertex/dislikes* 0)
+	 (*sample-count* 0)
+	 (*min-dislikes* (expt 2 31))
+	 (*max-dislikes* 0))
     (when solved-state
       (state-fixed-vertices (a-star-state-orig-state solved-state)))))
 
@@ -399,7 +455,8 @@
    (list
     :type "a-star"
     :estimate "dislikes"
-    :exhaustive *a-star-exhaustive?*)))
+    :exhaustive *a-star-exhaustive?*
+    :her *with-her*)))
 
 (defun compute-figure-vertex-costs (figure-points hole-points)
   (loop
@@ -477,7 +534,8 @@
     :type "a-star/mcts"
     :a-star-estimate "dislikes"
     :mcts-group-size *a-star/mcts-refinement-group-size*
-    :exhaustive *a-star-exhaustive?*)))
+    :exhaustive *a-star-exhaustive?*
+    :her *with-her*)))
 
 (defun compute-solution-cost (fixed-vertices hole)
   (loop :for c :across (compute-hole-distances fixed-vertices hole)

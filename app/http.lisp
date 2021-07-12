@@ -30,9 +30,12 @@
            (format file (get-problem id)))))
 
 (defun post-solution (id solution)
-  (http-request (format nil "~A/api/problems/~A/solutions" *url-base* id)
-                :additional-headers `(("Authorization" . ,*auth-token*))
-                :method :post
-                :content (with-output-to-string (stream)
-                           (encode (plist-hash-table (list "vertices" solution))
-                                   stream))))
+  (let ((stream (http-request (format nil "~A/api/problems/~A/solutions" *url-base* id)
+			      :additional-headers `(("Authorization" . ,*auth-token*))
+			      :method :post
+			      :want-stream t
+			      :content (with-output-to-string (stream)
+					 (encode (plist-hash-table (list "vertices" solution))
+						 stream)))))
+    (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
+    (print (yason:parse stream :object-as :plist))))

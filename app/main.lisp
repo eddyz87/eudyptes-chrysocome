@@ -35,18 +35,28 @@
 (defparameter *spring-solver-func*
   (lambda (problem)
     (icfpc2021/solver::solve problem :max-iters 100)))
+
 (defparameter *a-star/mcts-solver-func*
   (lambda (problem)
     (icfpc2021/mcts-solver:a-star/mcts-solve problem :debug-stream nil)))
 
-(defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6))
+(defparameter *a-star/mcts-with-her-solver-func*
+  (lambda (problem)
+    (let ((icfpc2021/mcts-solver::*with-her* t))
+      (icfpc2021/mcts-solver:a-star/mcts-solve problem :debug-stream nil))))
+
+
+(defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6) (timeout 60))
   (let ((problems-dir (or problems-dir (dir-pathname "../problems/")))
 	(solvers (ecase solver
 		   (:all (list
-			  *mcts-solver-func*
-			  *spring-solver-func*
+			  
+			  ;; *spring-solver-func*
 			  ;; *a-star-solver-func*
+			  
+			  *a-star/mcts-with-her-solver-func*
 			  *a-star/mcts-solver-func*
+			  *mcts-solver-func*
 			  ))
 		   (:mcts (list *mcts-solver-func*))
 		   (:spring (list *spring-solver-func*))
@@ -61,13 +71,12 @@
 			   (*problems-dir* problems-dir)
 			   (*solutions-dir* (or solutions-dir
 						(dir-pathname "../solutions/")))
-			   (icfpc2021/mcts-solver::*timeout-in-seconds* (+ 60 (random 10))))
+			   (icfpc2021/mcts-solver::*timeout-in-seconds* timeout))
 		       (process-problem problem-file solvers))))
 		 (uiop:directory-files problems-dir))))
-      (cl-threadpool:run-jobs threadpool jobs)
-      ;; (loop :while (not (cl-threadpool:pool-stopped-p threadpool))
-      ;; 	    :do (mapc #'cl-threadpool:job-result jobs)
-      ;; 		(sleep 5))
+      (if (<= n-threads 1)
+	  (loop :for job :in jobs :do (funcall job))
+	  (cl-threadpool:run-jobs threadpool jobs))
       (cl-threadpool:stop threadpool)
       (format t "Threadpool stopped!"))))
 
@@ -80,6 +89,11 @@
          (icfpc2021/mcts-solver::a-star-solver-info))
         ((eq solver *a-star/mcts-solver-func*)
          (icfpc2021/mcts-solver::a-star/mcts-solver-info))
+	((eq solver *a-star/mcts-with-her-solver-func*)
+         (let ((ht (icfpc2021/mcts-solver::a-star/mcts-solver-info)))
+	   (setf (gethash :type ht)
+		 "a-star/mcts-with-her")
+	   ht))
         (t (error "Unknown solver ~A~%" solver))))
 
 (defun process-problem (problem-file solvers)
@@ -107,7 +121,8 @@
 		  (if solution
 		      (progn
 			(format t "Solution computed by solver ~A for problem ~A: dislikes = ~A (saved ~A)~%"
-				solver-type problem-id dislikes (saved-solution-dislikes saved-solution))
+				solver-type problem-id dislikes
+				(when saved-solution (saved-solution-dislikes saved-solution)))
 			(when (or (null saved-solution)
 				  (< dislikes (saved-solution-dislikes saved-solution)))
 			  (save-json (saved-solution->ht

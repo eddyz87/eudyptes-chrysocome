@@ -315,7 +315,7 @@
 
 (defun get-solver-info ()
   (plist-hash-table
-   (list "type" "spring"
+   (list :type "spring"
 	 "max-iters" *max-iters*
 	 "phases-spec" (format nil "~A" *phases-spec*))))
 

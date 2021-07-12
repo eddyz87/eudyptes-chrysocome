@@ -22,6 +22,9 @@
 	  solutions-dir
 	  problem-id))
 
+(defmethod yason:encode ((x symbol) &optional stream)
+  (yason:encode (format nil "~A" x) stream))
+
 (defun save-json (ht filename)
   (with-open-file (stream filename
 			  :direction :output

@@ -33,28 +33,43 @@
                         (* timeout-in-seconds
                            internal-time-units-per-second))))
         (best-solution nil)
-        (best-estimate nil))
+        (best-estimate nil)
+	(last-n-fixed 0))
     (pileup:heap-insert initial-state queue)
     (loop :for state := (pileup:heap-pop queue)
           :while (and state
                       (or (null stop-time)
                           (< (get-internal-run-time) stop-time)))
-          :do (if (final-state? state)
-                  (if exhaustive?
-                      (when (or (null best-solution)
-                                (funcall predicate (state-estimate state) best-estimate))
-                        (setf best-estimate (state-estimate state)
-                              best-solution state))
-                      (return-from a-star state))
-                  (loop :for next-state :in (next-states state)
-                        :do (unless (and hash-state?
-                                         (gethash (state-hash-object next-state)
-                                                  visited))
-                              (when hash-state?
-                                (setf (gethash (state-hash-object next-state)
-                                               visited)
-                                      t))
-                              (pileup:heap-insert next-state queue)))))
+          :do (let ()
+		;; ((n-fixed (loop :for v :across
+		;; 			 (icfpc2021/mcts-solver::state-fixed-vertices
+		;; 			  (icfpc2021/mcts-solver::a-star-state-orig-state state))
+		;; 		  :when v :count 1)))
+		;; (when (< last-n-fixed n-fixed)
+		;;   (setf last-n-fixed n-fixed)
+		;;   (format t "f(state) = ~A; dislikes = ~A; n-fixed = ~A; n-free = ~A~%"
+		;; 	  (state-estimate state)
+		;; 	  (icfpc2021/mcts-solver::a-star-state-dislikes state)
+		;; 	  n-fixed
+		;; 	  (- (length (icfpc2021/mcts-solver::state-fixed-vertices
+		;; 		      (icfpc2021/mcts-solver::a-star-state-orig-state state)))
+		;; 	     n-fixed)))
+		(if (final-state? state)
+		    (if exhaustive?
+			(when (or (null best-solution)
+				  (funcall predicate (state-estimate state) best-estimate))
+			  (setf best-estimate (state-estimate state)
+				best-solution state))
+			(return-from a-star state))
+                    (loop :for next-state :in (next-states state)
+			  :do (unless (and hash-state?
+					   (gethash (state-hash-object next-state)
+                                                    visited))
+				(when hash-state?
+				  (setf (gethash (state-hash-object next-state)
+						 visited)
+					t))
+				(pileup:heap-insert next-state queue))))))
     (when exhaustive?
       best-solution)))
 
