@@ -52,6 +52,12 @@
 	  (icfpc2021/mcts-solver:*a-star-exhaustive?* t))
       (icfpc2021/mcts-solver:a-star-solve problem))))
 
+(defparameter *a-star-anneal-solver-func*
+  (lambda (problem)
+    ;; (let ((icfpc2021/mcts-solver::*with-her* t)
+    ;;       (icfpc2021/mcts-solver:*a-star-exhaustive?* t)))
+    (icfpc2021/mcts-solver:a-star-anneal-solve problem :debug-stream nil)))
+
 
 (defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6) (timeout 60))
   (let ((problems-dir (or problems-dir (dir-pathname "../problems/")))
@@ -68,7 +74,8 @@
 		   (:mcts (list *mcts-solver-func*))
 		   (:spring (list *spring-solver-func*))
                    (:a-star (list *a-star-solver-func*))
-                   (:a-star/mcts (list *a-star/mcts-solver-func*)))))
+                   (:a-star/mcts (list *a-star/mcts-solver-func*))
+                   (:a-star-anneal (list *a-star-anneal-solver-func*)))))
     (format t "Solving problems to find the best solution...~%~%")
     (let ((threadpool (cl-threadpool:make-threadpool n-threads))
 	  (jobs (mapcar
@@ -106,6 +113,8 @@
 	   (setf (gethash :type ht)
 		 "a-star-with-her")
 	   ht))
+        ((eq solver *a-star-anneal-solver-func*)
+         (icfpc2021/mcts-solver::a-star-anneal-solver-info))
         (t (error "Unknown solver ~A~%" solver))))
 
 (defun process-problem (problem-file solvers)

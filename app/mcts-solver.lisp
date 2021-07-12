@@ -19,7 +19,8 @@
            #:a-star/mcts-solve
            #:a-star/mcts-solver-info
 	   #:*a-star-exhaustive?*
-           #:a-star-anneal-solve))
+           #:a-star-anneal-solve
+           #:a-star-anneal-solver-info))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -620,10 +621,18 @@
   (/ 1
      (1+ (exp (- (* 7 x) 5)))))
 
-(defun a-star-anneal-solve (problem)
+(defun a-star-anneal-solver-info ()
+  (plist-hash-table
+   (list
+    :type "a-star-annealer"
+    :temperature-function "sigmoid (7x - 5)"
+    :max-iter-time "1/20 * budget"
+    :worsen-probability "(< (random 100) (* 25 (- 1 time-budget-elapsed)))")))
+
+(defun a-star-anneal-solve (problem &key (debug-stream *standard-output*))
   (with-problem-context problem
-    (format t "Figure vertices num : ~5A~%" (length (problem-init-pos problem)))
-    (format t "Hole vertices num   : ~5A~%" (length (problem-hole problem)))
+    (format debug-stream "Figure vertices num : ~5A~%" (length (problem-init-pos problem)))
+    (format debug-stream "Hole vertices num   : ~5A~%" (length (problem-hole problem)))
     (loop
       :with figure-vertices-num := (length (problem-init-pos problem))
       :with edges-array := (problem-edges problem)
@@ -672,7 +681,8 @@
                                       (* 25 (- 1 time-budget-elapsed)))
       :for time-improved? := (<= new-fixed-vertices-cost
                                  current-cost)
-      :do (format t "i: ~5A N: ~5A v: ~5A old cost: ~10A new cost: ~10A elapsed: ~5,2fs  time left: ~5,2f ~A~%"
+      :do (format debug-stream
+                  "i: ~5A N: ~5A v: ~5A old cost: ~10A new cost: ~10A elapsed: ~5,2fs  time left: ~5,2f ~A~%"
                   i N first-refinement-vertice current-cost
                   (when new-fixed-vertices
                     new-fixed-vertices-cost)
