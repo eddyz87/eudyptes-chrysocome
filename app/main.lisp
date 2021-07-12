@@ -18,6 +18,7 @@
                 #:plist-hash-table
                 #:hash-table-plist)
   (:import-from #:cl-threadpool)
+  (:import-from #:lquery)
   (:export #:main
            #:post-saved-solutions))
 
@@ -219,3 +220,40 @@
      :do (icfpc2021/http:post-solution
           (parse-integer (cl-ppcre:scan-to-strings "[0-9]+" (pathname-name file)))
           (saved-solution-vertices solution))))
+
+(defun parse-leaderboards (file)
+  (labels ((%int (str)
+             (ignore-errors (parse-integer str))))
+    (let* ((str (alexandria:read-file-into-string file))
+           (rows (lquery:$ (initialize str)
+                   "tr"
+                   (slice 1))))
+      (loop :for row :across rows
+            :collect (list (lquery:$1 row "td" (slice 0 1) (text))
+                           (%int (lquery:$1 row "td" (slice 1 2) (text)))
+                           (%int (lquery:$1 row "td" (slice 2 3) (text))))))))
+
+(defun compute-score (leaderboards &optional (dir (asdf:system-relative-pathname :icfpc2021 "../problems/")))
+  (let ((score 0))
+    (loop :for (id our-dislikes best-dislikes) :in leaderboards
+          :when our-dislikes
+            :do (let* ((file (format nil "~A/problem_~A.json" dir id))
+                       (problem (icfpc2021/parse:parse-json-file file))
+                       (problem-score (*
+                                    (length (icfpc2021/problem-defs:hole-vertices
+                                             (icfpc2021/problem-defs:problem-hole problem)))
+                                    (length (icfpc2021/problem-defs:figure-edges
+                                             (icfpc2021/problem-defs:problem-figure problem)))
+                                    (length (icfpc2021/problem-defs:figure-vertices
+                                             (icfpc2021/problem-defs:problem-figure problem)))))
+                       (dislike-score (sqrt (/ (1+ best-dislikes)
+                                               (1+ our-dislikes)))))
+                  (incf score
+                        (ceiling
+                         (* 1000
+                            (log (/ problem-score 6) 2)
+                            dislike-score)))))
+    score))
+
+(defun compute-score-from-file (leaderboards &optional (dir (asdf:system-relative-pathname :icfpc2021 "../problems/")))
+  (compute-score (parse-leaderboards leaderboards) dir))
