@@ -269,7 +269,11 @@
           (multiple-value-bind (intersect? non-strict?)
               (lines-intersect? line holy-line)
             (if non-strict?
-                (null (check-line line raster))
+                (null (or (check-line line raster)
+                          ;; (check-line (make-segment :a (segment-b line)
+                          ;;                          :b (segment-a line))
+                          ;;            raster)
+                          ))
                 intersect?)
             ;; (and (not non-strict?)
             ;;      intersect?)
@@ -336,6 +340,30 @@
                                             :b (make-point :x 20 :y 20))
                               (make-segment :a (make-point :x 20 :y 10)
                                             :b (make-point :x 30 :y 20))))
+    (loop :for i :from 0 :below (length poly)
+       :for j := (mod (1+ i) (length poly))
+       :unless (or (check-line (make-segment :a (aref poly i)
+                                             :b (aref poly j))
+                               raster)
+                   (check-line (make-segment :a (aref poly j)
+                                             :b (aref poly i))
+                               raster))
+       :do (format t "Bad answer for check-line for ~A~%"
+                   (make-segment :a (aref poly i)
+                                 :b (aref poly j)))
+         (let ((lr (make-array '(32 32) :element-type 'bit))
+               (lr2 (make-array '(32 32) :element-type 'bit)))
+           (visualize-raster raster)
+           (rasterize-line (make-segment :a (aref poly i)
+                                         :b (aref poly j))
+                           lr)
+           (rasterize-line (make-segment :a (aref poly j)
+                                         :b (aref poly i))
+                           lr2)
+           (visualize-raster lr)
+           (visualize-raster lr2)))
+
+
     (loop :for (x1 y1 x2 y2 expected) :in lines
        :for i :from 0
        :for result := (line-intersect?
@@ -347,15 +375,17 @@
        :do (format t "Bad answer: ~A~%" (nth i lines)))))
 
 (defun visualize-poly (poly)
-  (let ((raster (rasterize-polygon* poly)))
-    (terpri)
-    (loop :with (mx my) := (array-dimensions raster)
-       :for y :from 0 :below my
-       :do (loop :for x :from 0 :below mx
-              :do (princ (if (= 1 (aref raster x y))
-                             "x"
-                             ".")))
-         (terpri))))
+  (visualize-raster (rasterize-polygon* poly)))
+
+(defun visualize-raster (raster)
+  (terpri)
+  (loop :with (mx my) := (array-dimensions raster)
+     :for y :from 0 :below my
+     :do (loop :for x :from 0 :below mx
+            :do (princ (if (= 1 (aref raster x y))
+                           "x"
+                           ".")))
+       (terpri)))
 
 (defun visualize-solution (problem solution)
   (let* ((poly (rasterize-polygon* (problem-hole problem)))

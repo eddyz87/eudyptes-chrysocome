@@ -58,6 +58,9 @@
     ;;       (icfpc2021/mcts-solver:*a-star-exhaustive?* t)))
     (icfpc2021/mcts-solver:a-star-anneal-solve problem :debug-stream nil)))
 
+(defparameter *isomorphic-solver-func*
+  (lambda (problem)
+    (icfpc2021/mcts-solver:isomorphic-solve problem)))
 
 (defun main (&key problems-dir solutions-dir (solver :all) (n-threads 6) (timeout 60))
   (let ((problems-dir (or problems-dir (dir-pathname "../problems/")))
@@ -68,10 +71,12 @@
 			  ;; *a-star-solver-func*
 			  *a-star-with-her-solver-func*
 			  *a-star/mcts-with-her-solver-func*
+                         ;; *isomorphic-solver-func*
 			  ;; *a-star/mcts-solver-func*
 			  ;; *mcts-solver-func*
 			  ))
 		   (:mcts (list *mcts-solver-func*))
+                   (:iso (list *isomorphic-solver-func*))
 		   (:spring (list *spring-solver-func*))
                    (:a-star (list *a-star-solver-func*))
                    (:a-star/mcts (list *a-star/mcts-solver-func*))
@@ -103,6 +108,8 @@
          (icfpc2021/mcts-solver::a-star-solver-info))
         ((eq solver *a-star/mcts-solver-func*)
          (icfpc2021/mcts-solver::a-star/mcts-solver-info))
+        ((eq solver *isomorphic-solver-func*)
+         (icfpc2021/mcts-solver::isomorphic-solver-info))
 	((eq solver *a-star/mcts-with-her-solver-func*)
          (let ((ht (icfpc2021/mcts-solver::a-star/mcts-solver-info)))
 	   (setf (gethash :type ht)

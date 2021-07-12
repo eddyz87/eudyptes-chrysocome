@@ -5,9 +5,8 @@
         #:icfpc2021/circle
         #:icfpc2021/shortest-paths
         #:icfpc2021/mcts
+        #:trivia
         #:alexandria)
-  (:import-from #:alexandria
-		#:plist-hash-table)
   (:import-from #:icfpc2021/utils
 		#:dir-pathname)
   (:import-from #:icfpc2021/svg-drawer)
@@ -17,7 +16,9 @@
   (:export #:mcts-solve
            #:a-star-solve
            #:a-star/mcts-solve
+           #:isomorphic-solve
            #:a-star/mcts-solver-info
+           #:isomorphic-solve
 	   #:*a-star-exhaustive?*
            #:a-star-anneal-solve
            #:a-star-anneal-solver-info))
@@ -702,3 +703,101 @@
             (setf all-time-best       new-fixed-vertices)
             (setf all-time-best-cost  new-fixed-vertices-cost))
       :finally (return all-time-best))))
+
+;; isomorphic graph solver stuff
+
+(defstruct (isomorphic-state (:constructor make-is) (:conc-name is-))
+  orig-state
+  hole->vertex ; (array hole-idx -> (or vertex-idx null))
+  dislikes
+  )
+
+(defmethod next-state ((state isomorphic-state) action)
+  (make-is :orig-state (next-state (is-orig-state state) action)))
+
+(defun select-possible-positions (s)
+  (ematch s
+    ((isomorphic-state :orig-state (state :fixed-vertices fixed
+                                         :frontier (list* p _))
+                       :hole->vertex hv)
+     (or
+      (loop :with hole := (problem-hole *problem*)
+         :for i :from 0 :below (length hole)
+         :for j := (mod (1+ i) (length hole))
+         :for dist := (dist-square (aref hole i) (aref hole j))
+         :for src := (aref hv i)
+         :for dst := (aref hv j)
+         ;; when hole[i] is already filled and need to fill hole[j]
+         :when (and src (null dst))
+         :append (loop :for e :in (edges src)
+                    :for target := (edge-vertex e)
+                    :for len := (edge-len-square e)
+                    :when (and (null (aref fixed target))
+                               (same-distance? dist len))
+                    :collect (list target (aref hole j) j)))
+      (loop :for pos :in (possible-positions fixed p)
+           :collect (list p pos nil))))))
+
+(defmethod possible-actions ((state isomorphic-state) player)
+  (if (state-initial? (is-orig-state state))
+      (select-initial-vertices)
+      (select-possible-positions state)))
+
+(defmethod next-state ((state isomorphic-state) action)
+  (destructuring-bind (vertex position hole-idx) action
+    (let ((next-state (next-state (is-orig-state state)
+                                  (cons vertex position))))
+      (make-is :orig-state next-state
+               :hole->vertex (let ((hv (is-hole->vertex state)))
+                               (when hole-idx
+                                 (setf (aref hv hole-idx) vertex))
+                               hv)
+               :dislikes (state-dislikes next-state)))))
+
+(defmethod icfpc2021/a-star:next-states ((state isomorphic-state))
+  (mapcar (lambda (action)
+            (next-state (clone-state state) action))
+          (possible-actions state 0)))
+
+(defmethod icfpc2021/a-star:final-state? ((state isomorphic-state))
+  (zerop (count-if #'null (state-fixed-vertices
+                           (is-orig-state state)))))
+
+(defmethod clone-state ((state isomorphic-state))
+  (make-is :orig-state (clone-state (is-orig-state state))
+           :hole->vertex (subseq (is-hole->vertex state) 0)
+           :dislikes (is-dislikes state)))
+
+(defmethod estimate-state-rewards ((state isomorphic-state) player)
+  (estimate-state-rewards (is-orig-state state) player))
+
+(defmethod show-state ((state isomorphic-state))
+  (show-state (is-orig-state state)))
+
+(defmethod icfpc2021/a-star:state-estimate ((state isomorphic-state))
+  (+ (is-dislikes state) ;; kind of remaining distance
+     (if *with-her* (her state) 0) ;; kind of walked distance
+     ))
+
+(defun isomorphic-solve (problem)
+  (with-problem-context problem
+    (let ((state (icfpc2021/a-star:a-star
+                  (make-is :orig-state (make-initial-state)
+                           :hole->vertex (make-array
+                                          (array-dimensions
+                                           (problem-hole problem))
+                                          :initial-element nil)
+                           :dislikes most-positive-fixnum)
+                  :timeout-in-seconds *timeout-in-seconds*
+                  :exhaustive? *a-star-exhaustive?*)))
+      (when state
+        (state-fixed-vertices (is-orig-state state))))))
+
+(defun isomorphic-solver-info ()
+  (plist-hash-table
+   (list
+    :type "isomorphic"
+    :a-star-estimate "dislikes"
+    :mcts-group-size *a-star/mcts-refinement-group-size*
+    :exhaustive *a-star-exhaustive?*
+    :her *with-her*)))
