@@ -248,7 +248,7 @@
 (defun hole-for-vertices ()
   (loop :with hole-point := (aref (problem-hole *problem*) 0)
      :for vertex :across (problem-init-pos *problem*)
-     :collect (cons vertex hole-point)))
+     :collect (list vertex hole-point 0)))
 
 (defun select-initial-vertices ()
   (or (loop :with hole := (problem-hole *problem*)
@@ -260,7 +260,7 @@
                     :for edge-i :from 0 :below (length edges)
                     :append (loop :for edge :in (aref edges edge-i)
                                :when (same-distance? dist (edge-len-square edge))
-                               :collect (cons edge-i hole-i))))
+                               :collect (list edge-i hole-i i))))
       (hole-for-vertices)))
 
 (defun possible-positions (fixed-vertices free-vertex)
@@ -784,17 +784,19 @@
 
 (defun isomorphic-solve (problem)
   (with-problem-context problem
-    (let ((state (icfpc2021/a-star:a-star
-                  (make-is :orig-state (make-initial-state)
-                           :hole->vertex (make-array
-                                          (array-dimensions
-                                           (problem-hole problem))
-                                          :initial-element nil)
-                           :dislikes most-positive-fixnum)
-                  :timeout-in-seconds *timeout-in-seconds*
-                  :exhaustive? *a-star-exhaustive?*)))
-      (when state
-        (state-fixed-vertices (is-orig-state state))))))
+    (when (>= (length (problem-init-pos problem))
+              (length (problem-hole problem)))
+      (let ((state (icfpc2021/a-star:a-star
+                    (make-is :orig-state (make-initial-state)
+                             :hole->vertex (make-array
+                                            (array-dimensions
+                                             (problem-hole problem))
+                                            :initial-element nil)
+                             :dislikes most-positive-fixnum)
+                    :timeout-in-seconds *timeout-in-seconds*
+                    :exhaustive? *a-star-exhaustive?*)))
+        (when state
+          (state-fixed-vertices (is-orig-state state)))))))
 
 (defun isomorphic-solver-info ()
   (plist-hash-table
