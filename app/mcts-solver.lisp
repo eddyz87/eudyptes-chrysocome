@@ -17,7 +17,8 @@
   (:export #:mcts-solve
            #:a-star-solve
            #:a-star/mcts-solve
-           #:a-star/mcts-solver-info))
+           #:a-star/mcts-solver-info
+	   #:*a-star-exhaustive?*))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -51,6 +52,7 @@
 (defparameter *timeout-in-seconds* 60)
 (defparameter *exploration-coef* (sqrt 0.5))
 
+(defparameter *a-star-exhaustive?* nil)
 
 (defun exec-with-problem-context (problem fn)
   (let* ((max-coord (loop :for p :across (problem-hole problem)
@@ -100,13 +102,13 @@
                                 :if-does-not-exist :create)
           (print-decision-tree stream mcts-root root-state
                                :exploration-coefficient *exploration-coef*))))
-    (format t "Need solution with ~A steps~%" figure-vertices-num)
-    (format t "Complete estimates ratio: ~1,3f~%"
-            (if (/= (cdr *complete/total-estimates*) 0)
-                (/ (car *complete/total-estimates*)
-                   (cdr *complete/total-estimates*))
-                0))
-    (print-mcts-tree-stats mcts-root)
+    ;; (format t "Need solution with ~A steps~%" figure-vertices-num)
+    ;; (format t "Complete estimates ratio: ~1,3f~%"
+    ;;         (if (/= (cdr *complete/total-estimates*) 0)
+    ;;             (/ (car *complete/total-estimates*)
+    ;;                (cdr *complete/total-estimates*))
+    ;;             0))
+    ;; (print-mcts-tree-stats mcts-root)
     (mapc-children-actions
      mcts-root
      (lambda (reverse-actions)
@@ -375,7 +377,7 @@
 (defmethod icfpc2021/a-star:state-estimate ((state a-star-state))
   (a-star-state-dislikes state))
 
-(defparameter *a-star-exhaustive?* nil)
+
 
 (defun a-star-solve (problem)
   (with-problem-context problem
@@ -396,7 +398,8 @@
   (plist-hash-table
    (list
     "type" "a-star"
-	"estimate" "dislikes")))
+    "estimate" "dislikes"
+    "exhaustive" *a-star-exhaustive?*)))
 
 (defun compute-figure-vertex-costs (figure-points hole-points)
   (loop
@@ -473,20 +476,21 @@
    (list
     "type" "a-star/mcts"
     "a-star-estimate" "dislikes"
-    "mcts-group-size" *a-star/mcts-refinement-group-size*)))
+    "mcts-group-size" *a-star/mcts-refinement-group-size*
+    "exhaustive" *a-star-exhaustive?*)))
 
 (defun compute-solution-cost (fixed-vertices hole)
   (loop :for c :across (compute-hole-distances fixed-vertices hole)
         :summing c))
 
-(defun a-star/mcts-solve (problem)
+(defun a-star/mcts-solve (problem &key (debug-stream t))
   (let ((figure-vertices-num (length (problem-init-pos problem)))
         (start-time (get-internal-run-time)))
     (with-problem-context problem
       (labels
           ((%refine-once (already-refined fixed-vertices)
              (let* ((old-cost (compute-solution-cost fixed-vertices (problem-hole problem)))
-                    (_1 (format t "Trying to refine solution from ~A~%" old-cost))
+                    (_1 (format debug-stream "Trying to refine solution from ~A~%" old-cost))
                     (vertice-costs (compute-figure-vertex-costs fixed-vertices (problem-hole problem)))
                     (first-refinement-vertice (or (maximal-element-index
                                                    vertice-costs
@@ -494,7 +498,7 @@
                                                              (and (not (gethash idx already-refined))
                                                                   (/= 0 elt))))
                                                   (progn
-                                                    (format t "No more refinement points~%")
+                                                    (format debug-stream "No more refinement points~%")
                                                     (return-from %refine-once fixed-vertices))))
                     (refinement-vertices (collect-vertices-from-point first-refinement-vertice
                                                                       (problem-edges problem)
@@ -503,8 +507,8 @@
                                                :for index :in refinement-vertices
                                                :do (setf (aref new-vertices index) nil)
                                                :finally (return new-vertices)))
-                    (_2 (format t "going to refine vertices: ~A~%" refinement-vertices))
-                    (_3 (format t "frontier: ~A~%" (collect-frontier mcts-fixed-vertices
+                    (_2 (format debug-stream "going to refine vertices: ~A~%" refinement-vertices))
+                    (_3 (format debug-stream "frontier: ~A~%" (collect-frontier mcts-fixed-vertices
                                                                      (problem-edges problem))))
                     (mcts-state
                       (make-state
@@ -519,7 +523,7 @@
                                                            (/ (- (get-internal-run-time)
                                                                  start-time)
                                                               internal-time-units-per-second))))))
-                        (format t "Using MCTS timeout ~A~%" *timeout-in-seconds*)
+                        (format debug-stream "Using MCTS timeout ~A~%" *timeout-in-seconds*)
                         (mcts-solve-aux
                          :figure-vertices-num (length refinement-vertices)
                          :root-state mcts-state
@@ -530,10 +534,10 @@
                    (let ((new-cost (compute-solution-cost mcts-solution (problem-hole problem))))
                      (if (< new-cost old-cost)
                          (progn
-                           (format t "MCTS refined to ~A~%" new-cost)
+                           (format debug-stream "MCTS refined to ~A~%" new-cost)
                            mcts-solution)
                          (progn
-                           (format t "Discarding MCTS solution with worse score ~A~%" new-cost)
+                           (format debug-stream "Discarding MCTS solution with worse score ~A~%" new-cost)
                            fixed-vertices)))
                    (progn
                      (format t "MCTS failed to refine~%")
