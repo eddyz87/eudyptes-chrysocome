@@ -191,6 +191,10 @@
               (icfpc2021/problem-defs:problem-hole out-solution)))
 	        out-solution)))
 
+(defun poly-inner-check (problem)
+  (format t " inner dir = ~A"
+          (icfpc2021/polygon:poly-inner-dir (problem-hole problem))))
+
 (defun try-solve-all (solver dir)
   (loop :for file :in (uiop:directory-files dir)
         :do (multiple-value-bind (solution dislikes)

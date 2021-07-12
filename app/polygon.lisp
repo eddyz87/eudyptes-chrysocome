@@ -23,7 +23,7 @@
            #:rasterize-polygon*
            #:visualize-poly
            #:visualize-solution
-           ))
+           #:poly-inner-dir))
 
 (in-package :icfpc2021/polygon)
 
@@ -51,10 +51,12 @@
            (values
             (and (<= 0 val1 1)
                  (<= 0 val2 1))
-            (or (= 0 val1)
-                (= 1 val1)
-                (= 0 val2)
-                (= 1 val2))))
+            (when (or (= 0 val1)
+                      (= 1 val1))
+              val1)
+            (when (or (= 0 val2)
+                      (= 1 val2))
+              val2)))
        (arithmetic-error () nil)))))
 
 (deftype poly () '(vector point))
@@ -247,8 +249,21 @@
                (nil nil))))
     (%unify (sort intersections #'< :key #'car) nil)))
 
-(defun line->bound (line)
-  (ematch line
+(defstruct hole-segment
+  line
+  prev
+  next)
+
+(defun poly-hole-segment (poly i)
+  (make-hole-segment
+   :line (poly-segment poly i)
+   :prev (poly-segment poly (1- i))
+   :next (poly-segment poly (1+ i))))
+
+(defun hole-segment->bound (hs-or-seg)
+  (ematch (if (hole-segment-p hs-or-seg)
+              (hole-segment-line hs-or-seg)
+              hs-or-seg)
     ((segment :a (point (p-x x1) (p-y y1))
               :b (point (p-x x2) (p-y y2)))
      (make-rectangle :lows (list (min x1 x2)
@@ -256,26 +271,68 @@
                      :highs (list (max x1 x2)
                                   (max y1 y2))))))
 
+(defun point-line-side (line point)
+  (ematch (cons point line)
+    ((cons
+      (point (p-x x) (p-y y))
+      (segment :a (point (p-x x1) (p-y y1))
+               :b (point (p-x x2) (p-y y2))))
+     (signum (- (* (- x2 x1) (- y y1))
+                (* (- y2 y1) (- x x1)))))))
+
+(defun outer? (side)
+  (= side -1))
+
+(defun inner? (side)
+  (= side 1))
+
+(defun two-segments-outer-point? (seg1 seg2 p)
+  (let ((side1 (point-line-side seg1 p))
+        (side2 (point-line-side seg2 p)))
+    (cond
+      ((or (= 0 side1) (= 0 side2))
+       nil)
+      ((= side1 side2)
+       (outer? side1))
+      (t
+       (let ((seg2-side (point-line-side seg1 (segment-b seg2))))
+         (inner? seg2-side))))))
+
+(defun poly-segment (poly i)
+  (line (aref poly (mod i (length poly)))
+        (aref poly (mod (1+ i) (length poly)))))
+
 (defun poly->tree (poly)
-  (let ((tree (make-spatial-tree :r :rectfun #'line->bound)))
+  (let ((tree (make-spatial-tree :r :rectfun #'hole-segment->bound)))
     (loop :for i :below (length poly)
-       :for a := (aref poly i)
-       :for b := (aref poly (mod (1+ i) (length poly)))
-       :do (insert (make-segment :a a :b b) tree))
+          :do (insert (poly-hole-segment poly i) tree))
     tree))
 
 (defun line-intersect? (line poly-tree raster)
-  (some (lambda (holy-line)
-          (multiple-value-bind (intersect? non-strict?)
-              (lines-intersect? line holy-line)
-            (if non-strict?
-                (null (or (check-line line raster)
-                          ;; (check-line (make-segment :a (segment-b line)
-                          ;;                          :b (segment-a line))
-                          ;;            raster)
-                          ))
-                intersect?)
-            ;; (and (not non-strict?)
+  (declare (ignorable raster))
+  (some (lambda (holy-segment)
+          (multiple-value-bind (intersect? line-point? segment-point?)
+              (lines-intersect? line (hole-segment-line holy-segment))
+            (when intersect?
+              (cond (segment-point?
+                     (multiple-value-bind (seg1 seg2)
+                         (if (= segment-point? 0)
+                             (values (hole-segment-prev holy-segment)
+                                     (hole-segment-line holy-segment))
+                             (values (hole-segment-line holy-segment)
+                                     (hole-segment-next holy-segment)))
+                       (or (two-segments-outer-point? seg1 seg2 (segment-a line))
+                           (two-segments-outer-point? seg1 seg2 (segment-b line)))))
+                    (line-point?
+                     (or (outer? (point-line-side (hole-segment-line holy-segment)
+                                                  (segment-a line)))
+                         (outer? (point-line-side (hole-segment-line holy-segment)
+                                                  (segment-b line)))))
+                    (t t)))
+            ;; (if (or line-point? segment-point?)
+            ;;     (null (check-line line raster))
+            ;;     intersect?)
+            ;; (and (not (or line-point? segment-point?))
             ;;      intersect?)
             ))
         (search line poly-tree)))
@@ -324,16 +381,36 @@
                 (round (/ (+ x1 x2) 2))
                 (round (/ (+ y1 y2) 2)))))))
 
+(defun poly-inner-dir (poly)
+  ;; (let ((p (point 0 0)))
+  ;;   (loop
+  ;;     :for i :below (length poly)
+  ;;     :for seg := (poly-segment poly i)
+  ;;     :for side := (point-line-side seg p)
+  ;;     :unless (zerop side)
+  ;;       :do (let ((in? (point-in-polygon? p poly)))
+  ;;             (return (if in? side (- side))))))
+  (let ((max-y (loop :for i :below (length poly)
+                     :maximizing (p-y (aref poly i)))))
+    (loop :for i :below (length poly)
+          :for p := (aref poly i)
+          :for next-p := (aref poly (mod (1+ i) (length poly)))
+          :for prev-p := (aref poly (mod (1- i) (length poly)))
+          :do (when (= (p-y p) max-y)
+                (return (point-line-side (line prev-p p) next-p))))))
+
 (defun line-intersect?-test ()
-  (let* ((lines '((00 00 00 19 t)
+  (let* ((lines '((00 00 00 19 nil)
+                  (00 00 00 20 t)
                   (01 19 20 08 nil)
                   (01 19 29 19 t)
                   (10 19 29 19 t)
                   (19 11 21 11 t)
-                  ;; (20 00 20 20 t)
+                  (20 00 20 20 t)
                   (00 20 20 00 nil)
-                  ))
-         (poly (make-point-vec '((00 20) (10 20) (20 10) (30 20) (20 00))))
+                  (01 20 20 00 nil)
+                  (00 19 20 00 t)))
+         (poly (make-point-vec (reverse '((00 20) (10 20) (20 10) (30 20) (20 00)))))
          (raster (rasterize-polygon 32 32 poly))
          (tree (poly->tree poly)))
     (assert (lines-intersect? (make-segment :a (make-point :x 20 :y 0)

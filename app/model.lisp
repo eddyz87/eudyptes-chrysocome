@@ -37,6 +37,9 @@
            #:segment
 
            #:mapc-edges
+           #:line
+           #:line*
+           #:p=
            ))
 
 (in-package :icfpc2021/model)
@@ -44,6 +47,9 @@
 (defstruct (point (:conc-name p-))
   (x 0)
   (y 0))
+
+(defun point (x y)
+  (make-point :x x :y y))
 
 (defmethod print-object ((p point) stream)
   (format stream "<~A, ~A>" (p-x p) (p-y p)))
@@ -66,6 +72,13 @@
 (defstruct segment
   (a (make-point) :type point)
   (b (make-point) :type point))
+
+(defun line (p1 p2)
+  (make-segment :a p1
+                :b p2))
+
+(defun line* (x1 y1 x2 y2)
+  (line (point x1 y1) (point x2 y2)))
 
 (defun make-point-vec (list)
   (map 'vector
@@ -132,6 +145,10 @@
 (defun pv-add (p v)
   (make-point :x (+ (p-x p) (v-x v))
               :y (+ (p-y p) (v-y v))))
+
+(defun p= (p1 p2)
+  (and (= (p-x p1) (p-x p2))
+       (= (p-y p1) (p-y p2))))
 
 (defun mapc-edges (vertices edges-list-array func)
   (loop :for i :below (length vertices)
