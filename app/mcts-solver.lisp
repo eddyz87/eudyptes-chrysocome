@@ -18,7 +18,8 @@
            #:a-star-solve
            #:a-star/mcts-solve
            #:a-star/mcts-solver-info
-	   #:*a-star-exhaustive?*))
+	   #:*a-star-exhaustive?*
+           #:a-star-anneal-solve))
 
 (in-package :icfpc2021/mcts-solver)
 
@@ -436,11 +437,10 @@
   (with-problem-context problem
     (a-star-solve-aux)))
 
-(defun a-star-solve-aux ()
-  (let* ((init-state (make-a-star-state
-                      :orig-state (make-initial-state)
-                      :dislikes most-positive-fixnum))
-         (solved-state (icfpc2021/a-star:a-star
+(defun a-star-solve-aux (&key (init-state (make-a-star-state
+                                           :orig-state (make-initial-state)
+                                           :dislikes most-positive-fixnum)))
+  (let* ((solved-state (icfpc2021/a-star:a-star
                         init-state
                         :timeout-in-seconds *timeout-in-seconds*
                         :exhaustive? *a-star-exhaustive?*))
@@ -540,7 +540,14 @@
 
 (defun compute-solution-cost (fixed-vertices hole)
   (loop :for c :across (compute-hole-distances fixed-vertices hole)
-        :summing c))
+        :when c
+          :summing c))
+
+(defun copy-array-set-nils (array nil-indexes)
+  (loop :with new-vertices := (subseq array 0)
+        :for index :in nil-indexes
+        :do (setf (aref new-vertices index) nil)
+        :finally (return new-vertices)))
 
 (defun a-star/mcts-solve (problem &key (debug-stream t))
   (let ((figure-vertices-num (length (problem-init-pos problem)))
@@ -562,10 +569,7 @@
                     (refinement-vertices (collect-vertices-from-point first-refinement-vertice
                                                                       (problem-edges problem)
                                                                       *a-star/mcts-refinement-group-size*))
-                    (mcts-fixed-vertices (loop :with new-vertices := (subseq fixed-vertices 0)
-                                               :for index :in refinement-vertices
-                                               :do (setf (aref new-vertices index) nil)
-                                               :finally (return new-vertices)))
+                    (mcts-fixed-vertices (copy-array-set-nils fixed-vertices refinement-vertices))
                     (_2 (format debug-stream "going to refine vertices: ~A~%" refinement-vertices))
                     (_3 (format debug-stream "frontier: ~A~%" (collect-frontier mcts-fixed-vertices
                                                                      (problem-edges problem))))
@@ -609,3 +613,82 @@
           :for i :below figure-vertices-num ;; TODO ???
           :do (setf fixed-vertices (%refine-once already-refined fixed-vertices))
           :finally (return fixed-vertices))))))
+
+;; A-star annealer
+
+(defun sigmoid (x)
+  (/ 1
+     (1+ (exp (- (* 7 x) 5)))))
+
+(defun a-star-anneal-solve (problem)
+  (with-problem-context problem
+    (format t "Figure vertices num : ~5A~%" (length (problem-init-pos problem)))
+    (format t "Hole vertices num   : ~5A~%" (length (problem-hole problem)))
+    (loop
+      :with figure-vertices-num := (length (problem-init-pos problem))
+      :with edges-array := (problem-edges problem)
+      :with hole := (problem-hole problem)
+      :with fixed-vertices := (or (a-star-solve-aux)
+                                  (return-from a-star-anneal-solve))
+      :with current-cost := (compute-solution-cost fixed-vertices hole)
+      :with all-time-best := fixed-vertices
+      :with all-time-best-cost := current-cost
+      :with start-time := (get-internal-run-time)
+      :for i :from 0
+      :for elapsed-time := (- (get-internal-run-time) start-time)
+      :for time-budget-elapsed := (/ elapsed-time
+                                     internal-time-units-per-second
+                                     *timeout-in-seconds*)
+      :while (< time-budget-elapsed 1)
+      ;; (expt (cos (/ (* pi time-budget-elapsed) 2)) 1/7)
+      :for N := (ceiling (* 0.75 figure-vertices-num
+                            (sigmoid time-budget-elapsed)))
+      ;; TODO: prioritize costly vertices?
+      :for first-refinement-vertice := (random (length fixed-vertices))
+      :for refinement-vertices := (collect-vertices-from-point first-refinement-vertice
+                                                               (problem-edges problem)
+                                                               N)
+      :for partially-fixed-vertices := (copy-array-set-nils fixed-vertices refinement-vertices)
+      :for partial-state
+        := (make-state
+            :fixed-vertices partially-fixed-vertices
+            :frontier (collect-frontier partially-fixed-vertices edges-array)
+            :nearest-figure-vertice-dist (compute-hole-distances partially-fixed-vertices hole))
+      :for step-start-time := (get-internal-run-time)
+      :for new-fixed-vertices
+        := (let ((*timeout-in-seconds* (ceiling
+                                        (min (/ *timeout-in-seconds* 20)
+                                             (* *timeout-in-seconds*
+                                                (- 1 time-budget-elapsed))))))
+             (a-star-solve-aux
+              :init-state (make-a-star-state
+                           :orig-state partial-state
+                           :dislikes (compute-solution-cost partially-fixed-vertices hole))))
+      :for step-stop-time := (get-internal-run-time)
+      :for new-fixed-vertices-cost := (if new-fixed-vertices
+                                          (compute-solution-cost new-fixed-vertices hole)
+                                          most-positive-fixnum)
+      :for allow-backwards-move := (< (random 100)
+                                      (* 25 (- 1 time-budget-elapsed)))
+      :for time-improved? := (<= new-fixed-vertices-cost
+                                 current-cost)
+      :do (format t "i: ~5A N: ~5A v: ~5A old cost: ~10A new cost: ~10A elapsed: ~5,2fs  time left: ~5,2f ~A~%"
+                  i N first-refinement-vertice current-cost
+                  (when new-fixed-vertices
+                    new-fixed-vertices-cost)
+                  (/ (- step-stop-time step-start-time)
+                     internal-time-units-per-second)
+                  (- 1 time-budget-elapsed)
+                  (if (and (not time-improved?)
+                           allow-backwards-move)
+                      "*" ""))
+      :do (when (and new-fixed-vertices
+                     (or time-improved?
+                         allow-backwards-move))
+            (setf fixed-vertices  new-fixed-vertices)
+            (setf current-cost    new-fixed-vertices-cost))
+      :do (when (< new-fixed-vertices-cost
+                   all-time-best-cost)
+            (setf all-time-best       new-fixed-vertices)
+            (setf all-time-best-cost  new-fixed-vertices-cost))
+      :finally (return all-time-best))))
