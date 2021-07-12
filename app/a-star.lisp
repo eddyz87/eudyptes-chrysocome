@@ -64,7 +64,7 @@
 					 best-estimate))
 			(setf best-estimate (state-estimate state)
 			      best-solution state))
-		      (when exhaustive?
+		      (unless exhaustive?
 			(return-from a-star state)))
                     (loop :for next-state :in (next-states state)
 			  :do (unless (and hash-state?
