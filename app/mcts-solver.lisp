@@ -628,7 +628,9 @@
     :type "a-star-annealer"
     :temperature-function "sigmoid (7x - 5)"
     :max-iter-time "1/20 * budget"
-    :worsen-probability "(< (random 100) (* 25 (- 1 time-budget-elapsed)))")))
+    :worsen-probability "(< (random 100) (* 25 (- 1 time-budget-elapsed)))"
+    :exhaustive *a-star-exhaustive?*
+    :her *with-her*)))
 
 (defun a-star-anneal-solve (problem &key (debug-stream *standard-output*))
   (with-problem-context problem
@@ -669,7 +671,8 @@
         := (let ((*timeout-in-seconds* (ceiling
                                         (min (/ *timeout-in-seconds* 20)
                                              (* *timeout-in-seconds*
-                                                (- 1 time-budget-elapsed))))))
+                                                (- 1 time-budget-elapsed)))))
+                 (*a-star-exhaustive?* nil))
              (a-star-solve-aux
               :init-state (make-a-star-state
                            :orig-state partial-state
